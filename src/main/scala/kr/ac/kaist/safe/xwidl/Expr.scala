@@ -2,9 +2,10 @@ package kr.ac.kaist.safe.xwidl
 
 sealed trait Expr
 
-case class IfThenElseExpr(cond: Expr,
-                          thenBranch: Expr,
-                          elseBranch: Expr
+case class IfThenElseExpr(
+  cond: Expr,
+  thenBranch: Expr,
+  elseBranch: Expr
 ) extends Expr
 
 case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr
