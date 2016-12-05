@@ -1,4 +1,4 @@
-package kr.ac.kaist.safe.xwidl
+package kr.ac.kaist.safe.xwidl.spec
 
 sealed trait Type
 
