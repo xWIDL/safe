@@ -21,10 +21,10 @@ lazy val root = (project in file(".")).
     organization := "kr.ac.kaist.safe",
     scalaVersion := "2.12.0-M5",
     checkCopyrights in Compile := {
-      val violated: String = (baseDirectory.value + "/bin/checkCopyrights.sh" !!)
-      if (violated != "") {
-        throw new Error("\nFix the copyright(s) of the following:\n" + violated)
-      }
+//      val violated: String = (baseDirectory.value + "/bin/checkCopyrights.sh" !!)
+//      if (violated != "") {
+//        throw new Error("\nFix the copyright(s) of the following:\n" + violated)
+//      }
     },
     buildParsers in Compile := {
       // xtc
