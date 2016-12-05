@@ -1,5 +1,8 @@
 package kr.ac.kaist.safe.xwidl
 
-class Type {
+sealed trait Type
 
-}
+sealed trait PrimType extends Type
+
+case object TyNum extends PrimType
+

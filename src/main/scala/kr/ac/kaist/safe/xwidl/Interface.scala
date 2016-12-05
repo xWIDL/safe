@@ -4,14 +4,14 @@ import kr.ac.kaist.safe.analyzer.domain.PValue
 
 import scala.collection.immutable.HashMap
 
-class Interface (val name: String,
-                 val kind: InterfaceKind,
-                 val constants: HashMap[String, PValue],
-                 val operations: HashMap[String, Operation]
+class Interface (name: String,
+                 kind: InterfaceKind,
+                 constants: HashMap[String, PValue],
+                 operations: HashMap[String, Operation]
 ) {
 
 }
 
 sealed trait InterfaceKind
 
-case class ECMAScriptInterface() extends InterfaceKind
+case object ECMAScriptInterface extends InterfaceKind
