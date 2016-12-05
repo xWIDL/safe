@@ -638,7 +638,13 @@ class Semantics(
 
   def V(expr: CFGExpr, st: AbsState): (AbsValue, Set[Exception]) = {
     expr match {
-      case CFGVarRef(ir, id) => st.lookup(id)
+      case CFGVarRef(ir, id) => {
+        val (v, es) = st.lookup(id)
+        if (v.isBottom) {
+          println(s"Undefined name: $id")
+        }
+        (v, es)
+      }
       case CFGLoad(ir, obj, index) => {
         val (objV, _) = V(obj, st)
         val (idxV, idxExcSet) = V(index, st)
