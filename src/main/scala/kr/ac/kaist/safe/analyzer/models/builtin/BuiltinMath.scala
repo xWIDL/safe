@@ -31,12 +31,7 @@ object BuiltinMath extends ObjModel(
 
     NormalProp("abs", FuncModel(
       name = "Math.abs",
-      code = PureCode(argLen = 1, (args, st) => {
-        val h = st.heap
-        val resV = Helper.propLoad(args, Set(AbsString("0")), h)
-        val num = TypeConversionHelper.ToNumber(resV).abs
-        AbsValue(num)
-      })
+      code = XWIDLCode("Math.abs", (_, _) => DefaultValue.Bot)
     ), T, F, T),
 
     NormalProp("acos", FuncModel(

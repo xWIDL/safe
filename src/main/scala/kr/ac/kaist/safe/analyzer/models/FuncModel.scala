@@ -55,7 +55,11 @@ class FuncModel(
       val fidOpt = Some(func.id)
       val constructIdOpt = construct.map(_.getCFGFunc(cfg, name).id)
       val scope = AbsValue(Null) // TODO get scope as args
-      val n = AbsNumber(code.argLen)
+      val n: AbsNumber = if (code.argLen >= 0) { // FIXME (izgzhen): We shouldn't use negative number to represent the exceptional case
+        AbsNumber(code.argLen)
+      } else {
+        AbsNumber.UInt
+      }
       val funcObj = AbsObject.newFunctionObject(
         fidOpt,
         constructIdOpt,

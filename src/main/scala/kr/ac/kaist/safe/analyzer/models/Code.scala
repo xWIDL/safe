@@ -156,3 +156,17 @@ object PureCode {
     code: (AbsValue, AbsState) => AbsValue
   ): PureCode = new PureCode(argLen, code)
 }
+
+class XWIDLCode(
+  override val argLen: Int = -1,
+  name: String,
+  code: (AbsValue, AbsState) => AbsValue
+) extends BasicCode(argLen, HashSet(), (v: AbsValue, st: AbsState) => {
+  (st, AbsState.Bot, code(v, st))
+})
+object XWIDLCode {
+  def apply(
+    name: String,
+    code: (AbsValue, AbsState) => AbsValue
+  ): XWIDLCode = new XWIDLCode(-1, name, code)
+}
