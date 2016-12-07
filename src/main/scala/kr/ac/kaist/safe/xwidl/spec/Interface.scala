@@ -5,9 +5,9 @@ import kr.ac.kaist.safe.analyzer.domain.PValue
 import scala.collection.immutable.HashMap
 
 class Interface(
-    name: String,
+    val name: String,
     kind: InterfaceKind,
-    constants: HashMap[String, PValue],
+    val constants: HashMap[String, PValue],
     operations: HashMap[String, Operation]
 ) {
 
