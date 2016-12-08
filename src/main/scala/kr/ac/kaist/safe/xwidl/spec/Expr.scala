@@ -23,3 +23,5 @@ case object And extends BiOp
 sealed trait Literal
 
 case class PrimInt(i: Int) extends Literal
+case class PrimBool(b: Boolean) extends Literal
+
