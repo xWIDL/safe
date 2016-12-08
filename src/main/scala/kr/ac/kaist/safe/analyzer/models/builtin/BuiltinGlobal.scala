@@ -129,11 +129,9 @@ object BuiltinGlobal extends ObjModel(
     // 15.1.4.15 URIError(...)
     NormalProp("URIError", BuiltinURIError, T, F, T),
     // 15.1.5.1 Math(...)
-    NormalProp("Math", BuiltinMath, T, F, T),
+    NormalProp("Math", ObjBuilder.buildObj(BuiltinMath), T, F, T),
     // 15.1.5.2 JSON(...)
     NormalProp("JSON", BuiltinJSON, T, F, T),
-
-    NormalProp("ECMAScriptMath", ObjBuilder.buildObj(ObjBuilder.mathInterface), T, F, T),
 
     NormalProp(NodeUtil.GLOBAL_NAME, SelfModel, F, F, F),
     NormalProp(NodeUtil.VAR_TRUE, PrimModel(true), F, F, F)

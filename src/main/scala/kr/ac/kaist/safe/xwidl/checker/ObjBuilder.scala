@@ -37,14 +37,6 @@ object ObjBuilder {
         }).toList
     )
   }
-
-  def mathInterface: Interface = Interface(
-    "ECMAScriptMath", ECMAScriptInterface,
-    HashMap("E" -> Num(2.7182818284590452354)),
-    HashMap("abs" -> Operation("abs", List(Argument("x", TyNum)), TyNum, LitExpr(PrimBool(true)), Some({
-      case (_, args) => AbsValue(TypeConversionHelper.ToNumber(args.head).abs)
-    })))
-  )
 }
 
 // Some examples...

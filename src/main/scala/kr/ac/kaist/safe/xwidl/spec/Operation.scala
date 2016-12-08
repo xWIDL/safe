@@ -14,3 +14,5 @@ case class Argument(
   name: String,
   ty: Type
 )
+
+// FIXME: variadic functions
