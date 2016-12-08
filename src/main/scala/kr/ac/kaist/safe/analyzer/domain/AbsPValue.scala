@@ -12,6 +12,8 @@
 package kr.ac.kaist.safe.analyzer.domain
 
 import kr.ac.kaist.safe.analyzer.domain.Utils._
+import kr.ac.kaist.safe.xwidl.spec.{Expr, LitExpr, PrimBool}
+
 import scala.collection.immutable.HashSet
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -85,6 +87,7 @@ object DefaultPValue extends AbsPValueUtil {
       strval: AbsString
   ) extends AbsPValue {
     def gamma: ConSet[PValue] = ConInf() // TODO more precisely
+    def gamma2(s: String): Expr = LitExpr(PrimBool(false))
 
     def isBottom: Boolean = this == Bot
     def isTop: Boolean = this == Top

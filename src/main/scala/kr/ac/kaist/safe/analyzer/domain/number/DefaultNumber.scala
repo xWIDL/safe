@@ -12,6 +12,7 @@
 package kr.ac.kaist.safe.analyzer.domain
 
 import kr.ac.kaist.safe.analyzer.domain.Utils._
+import kr.ac.kaist.safe.xwidl.spec._
 
 // default number abstract domain
 object DefaultNumber extends AbsNumberUtil {
@@ -46,6 +47,13 @@ object DefaultNumber extends AbsNumberUtil {
       case UIntConst(v) => ConFin(v)
       case NUIntConst(v) => ConFin(v)
       case Top | UInt | NUInt => ConInf()
+    }
+
+    def gamma2 (s: String) = this match {
+      case Bot => LitExpr(PrimBool(false))
+      case Inf => LitExpr(PrimBool(false)) // FIXME
+      case PosInf => BiOpExpr(VarExpr("x"), GreaterThan, LitExpr(PrimInt(0)))
+        // FIXME: more cases
     }
 
     def isBottom: Boolean = this == Bot

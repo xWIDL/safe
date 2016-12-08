@@ -20,6 +20,15 @@ object ObjBuilder {
               // A rough check: If all arguments type-match, then return a most general
               // representation of the returned type
               val h = st.heap
+              val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
+                case (arg, i) => {
+                  val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
+                  arg.ty match {
+                    case TyNum => Predicate("x", TyNum, argVal.pvalue.numval.gamma2("x"))
+                  }
+                }
+              }).toList
+
               val argsMatch: Boolean = op.args.view.zipWithIndex.forall({
                 case (arg, i) => Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absVal
               })
