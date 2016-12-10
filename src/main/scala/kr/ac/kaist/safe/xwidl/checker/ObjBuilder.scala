@@ -24,10 +24,13 @@ object ObjBuilder {
                 case (arg, i) => {
                   val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
                   arg.ty match {
-                    case TyNum => Predicate("x", TyNum, argVal.pvalue.numval.gamma2("x"))
+                    case TyNum => Predicate("x", TyNum, argVal.pvalue.gamma2("x"))
+                    // FIXME: other cases
                   }
                 }
               }).toList
+
+              println(argPreds)
 
               val argsMatch: Boolean = op.args.view.zipWithIndex.forall({
                 case (arg, i) => Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absVal
