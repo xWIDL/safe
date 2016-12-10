@@ -1,18 +1,35 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-sealed trait Expr
+import kr.ac.kaist.safe.xwidl.dafny.Pack
+import kr.ac.kaist.safe.xwidl.pprint._
+
+sealed trait Expr extends Pack
 
 case class IfThenElseExpr(
-  cond: Expr,
-  thenBranch: Expr,
-  elseBranch: Expr
-) extends Expr
+    cond: Expr,
+    thenBranch: Expr,
+    elseBranch: Expr
+) extends Expr {
 
-case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr
-case class VarExpr(name: String) extends Expr
-case class LitExpr(lit: Literal) extends Expr
+  def pack: Doc =
+    text("if") <> parens(cond.pack) <+>
+      text("then") <+> braces(thenBranch.pack) <+> text("else") <+> braces(elseBranch.pack)
+}
 
-sealed trait BiOp
+case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
+  def pack: Doc = le.pack <+> op.pack <+> re.pack
+}
+case class VarExpr(name: String) extends Expr {
+  def pack: Doc = text(name)
+}
+
+case class LitExpr(lit: Literal) extends Expr {
+  def pack: Doc = lit.pack
+}
+
+sealed trait BiOp extends Pack {
+  def pack: Doc = text(this.toString)
+}
 
 case object EqOp extends BiOp {
   override def toString: String = "="
@@ -30,8 +47,13 @@ case object And extends BiOp {
   override def toString: String = "&&"
 }
 
-sealed trait Literal
+sealed trait Literal extends Pack
 
-case class PrimInt(i: Int) extends Literal
-case class PrimBool(b: Boolean) extends Literal
+case class PrimInt(i: Int) extends Literal {
+  def pack: Doc = text(i.toString)
+}
+
+case class PrimBool(b: Boolean) extends Literal {
+  def pack: Doc = text(b.toString)
+}
 

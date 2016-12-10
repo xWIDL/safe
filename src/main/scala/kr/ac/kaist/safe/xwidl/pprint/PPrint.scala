@@ -32,9 +32,9 @@ object bracket {
     group(text(l) <> nest(2, line <> x) <> line <> text(r))
 }
 
-trait Pretty {
-  def pretty: Doc
-}
+object parens { def apply(x: Doc): Doc = text("(") <> x <> text(")") }
+
+object braces { def apply(x: Doc): Doc = bracket("{", x, "}") }
 
 case object nil extends Doc
 final case class <>(d1: Doc, d2: Doc) extends Doc
