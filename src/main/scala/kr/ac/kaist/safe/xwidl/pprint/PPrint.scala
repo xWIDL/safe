@@ -5,6 +5,7 @@
 package kr.ac.kaist.safe.xwidl.pprint
 
 import scala.annotation.tailrec
+import scala.collection.immutable._;
 
 trait Doc {
   def <>(d: Doc): Doc = {
@@ -18,6 +19,8 @@ trait Doc {
   final def <+>(y: Doc): Doc = this <> text(" ") <> y
   final def </>(y: Doc): Doc = this <> line <> y
   final def <+/>(y: Doc): Doc = this <> (text(" ") :<|> line) <> y
+
+  override def toString: String = showDoc(80, this)
 }
 
 object spread { def apply(xs: List[Doc]): Doc = xs.fold(nil)({ case (x, y) => x <+> y }) }
@@ -27,6 +30,10 @@ object stack { def apply(xs: List[Doc]): Doc = xs.fold(nil)({ case (x, y) => x <
 object bracket {
   def apply(l: String, x: Doc, r: String): Doc =
     group(text(l) <> nest(2, line <> x) <> line <> text(r))
+}
+
+trait Pretty {
+  def pretty: Doc
 }
 
 case object nil extends Doc
@@ -102,6 +109,6 @@ object fits {
   }
 }
 
-object pretty {
+object showDoc {
   def apply(w: Int, x: Doc): String = layout(best(w, 0, x))
 }
