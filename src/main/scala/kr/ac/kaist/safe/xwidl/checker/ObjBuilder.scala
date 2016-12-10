@@ -6,8 +6,6 @@ import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.xwidl.spec._
 import kr.ac.kaist.safe.analyzer._
 
-import scala.collection.immutable.HashMap
-
 object ObjBuilder {
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
@@ -50,6 +48,3 @@ object ObjBuilder {
     )
   }
 }
-
-// Some examples...
-

@@ -14,11 +14,21 @@ case class LitExpr(lit: Literal) extends Expr
 
 sealed trait BiOp
 
-case object EqOp extends BiOp
-case object GreaterThan extends BiOp
-case object GreaterEq extends BiOp
-case object LessEq extends BiOp
-case object And extends BiOp
+case object EqOp extends BiOp {
+  override def toString: String = "="
+}
+case object GreaterThan extends BiOp {
+  override def toString: String = ">"
+}
+case object GreaterEq extends BiOp {
+  override def toString: String = ">="
+}
+case object LessEq extends BiOp {
+  override def toString: String = "<="
+}
+case object And extends BiOp {
+  override def toString: String = "&&"
+}
 
 sealed trait Literal
 
