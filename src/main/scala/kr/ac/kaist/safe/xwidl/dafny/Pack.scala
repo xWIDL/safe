@@ -14,5 +14,9 @@ object Pack {
         case PrimInt(i) => i.toString
       }
     }
+
+    //    def packInterface(i: Interface): String = {
+    //      "interfacei.name
+    //    }
   }
 }
