@@ -12,14 +12,14 @@
 package kr.ac.kaist.safe.analyzer.domain
 
 import kr.ac.kaist.safe.analyzer.domain.Utils._
-import kr.ac.kaist.safe.xwidl.spec.{ Expr, LitExpr, PrimBool }
+import kr.ac.kaist.safe.xwidl.dafny.Pack
 
 import scala.collection.immutable.HashSet
 
 ////////////////////////////////////////////////////////////////////////////////
 // concrete primitive value type
 ////////////////////////////////////////////////////////////////////////////////
-abstract class PValue extends Value
+abstract class PValue extends Value with Pack
 
 ////////////////////////////////////////////////////////////////////////////////
 // primitive value abstract domain
