@@ -10,14 +10,13 @@ case class Interface(
     name: String,
     kind: InterfaceKind,
     constants: HashMap[String, PValue],
+    /* NOTE: This will not be packed; instead, it will be directly inlined when needed */
+
     operations: HashMap[String, Operation]
 ) extends Pack {
   def pack: Doc = {
-    text("interface") <+> text(name) <+>
-      braces(
-        stack(constants.map({ case (cname, pval) => text("const") <+> getPtype(pval).pack <+> pval.pack }).toList)
-
-      )
+    text("class") <+> text(name) <+>
+      braces(stack(operations.values.map(_.pack).toList))
   }
 }
 

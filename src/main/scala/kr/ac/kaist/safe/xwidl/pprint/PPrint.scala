@@ -25,11 +25,21 @@ trait Doc {
 
 object spread { def apply(xs: List[Doc]): Doc = xs.fold(nil)({ case (x, y) => x <+> y }) }
 
+object splitBy {
+  def apply(elems: List[Doc], delimiter: Doc): Doc = {
+    elems match {
+      case Nil => nil
+      case List(x) => x
+      case x :: xs => x <> delimiter <> splitBy(xs, delimiter)
+    }
+  }
+}
+
 object stack { def apply(xs: List[Doc]): Doc = xs.fold(nil)({ case (x, y) => x </> y }) }
 
 object bracket {
   def apply(l: String, x: Doc, r: String): Doc =
-    group(text(l) <> nest(2, line <> x) <> line <> text(r))
+    text(l) <> nest(2, x) </> text(r)
 }
 
 object parens { def apply(x: Doc): Doc = text("(") <> x <> text(")") }

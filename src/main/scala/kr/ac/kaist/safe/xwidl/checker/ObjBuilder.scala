@@ -28,7 +28,7 @@ object ObjBuilder {
                 }
               }).toList
 
-              println(argPreds)
+              println(interface.pack.toString)
 
               val argsMatch: Boolean = op.args.view.zipWithIndex.forall({
                 case (arg, i) => Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absVal
