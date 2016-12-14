@@ -14,7 +14,13 @@ sealed trait PrimType extends Type
 case object TyNum extends PrimType {
   val absVal: AbsValue = AbsValue(AbsNumber.Top)
 
-  def pack: Doc = text("double")
+  def pack: Doc = text("real")
+}
+
+case object TyVoid extends Type {
+  val absVal: AbsValue = AbsValue(AbsUndef.Top)
+
+  def pack: Doc = text("void")
 }
 
 object getPtype {

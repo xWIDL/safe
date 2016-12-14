@@ -13,8 +13,12 @@ case class Operation(
 ) extends Pack {
   def pack: Doc = {
     text("method") <+> text(name) <>
-      parens(splitBy(args.map(_.pack), text(", ")))
-    // FIXME: if return type is not void, we need something here
+      parens(splitBy(args.map(_.pack), text(", "))) <>
+      (retTy match {
+        case TyVoid => nil
+        case _ => text(" returns") <+> parens(text("ret:") <+> retTy.pack)
+      }) </>
+      text("ensures") <+> ensures.pack
   }
 }
 

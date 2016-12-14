@@ -10,7 +10,9 @@ case class Interface(
     name: String,
     kind: InterfaceKind,
     constants: HashMap[String, PValue],
-    /* NOTE: This will not be packed; instead, it will be directly inlined when needed */
+    /* NOTE: This will not be packed;
+       instead, it will be directly inlined when needed.
+       See ObjBuilder. */
 
     operations: HashMap[String, Operation]
 ) extends Pack {
