@@ -8,6 +8,7 @@ case class Operation(
     name: String,
     args: List[Argument],
     retTy: Type,
+    requires: Expr,
     ensures: Expr,
     absSemOpt: Option[(AbsState, List[AbsValue]) => AbsValue]
 ) extends Pack {
@@ -18,6 +19,7 @@ case class Operation(
         case TyVoid => nil
         case _ => text(" returns") <+> parens(text("ret:") <+> retTy.pack)
       }) </>
+      text("requires") <+> requires.pack </>
       text("ensures") <+> ensures.pack
   }
 }

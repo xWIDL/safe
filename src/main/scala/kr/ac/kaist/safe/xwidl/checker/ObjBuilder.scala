@@ -5,8 +5,12 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.xwidl.spec._
 import kr.ac.kaist.safe.analyzer._
+import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
+import kr.ac.kaist.safe.xwidl.dafny.Dafny
 
 object ObjBuilder {
+  var dafny = new Dafny("", List(BuiltinMath))
+
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
       interface.name,
@@ -36,6 +40,8 @@ object ObjBuilder {
                 .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
 
               if (argsMatch.forall({ case (_, matched) => matched })) {
+                dafny.call(interface.name, name, absArgs)
+
                 op.absSemOpt match {
                   case Some(sem) => sem(st, absArgs)
                   case None => op.retTy.absVal

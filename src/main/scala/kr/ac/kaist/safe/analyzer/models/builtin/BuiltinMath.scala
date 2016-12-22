@@ -41,7 +41,13 @@ object BuiltinMath extends Interface(
       name = "abs",
       args = List(Argument("x", TyNum)),
       retTy = TyNum,
-      ensures = LitExpr(PrimBool(true)),
+      requires = LitExpr(PrimBool(true)),
+      ensures =
+        IfThenElseExpr(
+          BiOpExpr(VarExpr("x"), LessEq, LitExpr(PrimInt(0))),
+          BiOpExpr(VarExpr("_ret"), EqOp, BiOpExpr(LitExpr(PrimInt(0)), Minus, VarExpr("x"))),
+          BiOpExpr(VarExpr("_ret"), EqOp, VarExpr("x"))
+        ),
       absSemOpt = Some({
         case (_, args) => AbsValue(TypeConversionHelper.ToNumber(args.head).abs)
       })

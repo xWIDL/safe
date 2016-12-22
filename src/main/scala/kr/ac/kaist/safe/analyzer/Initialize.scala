@@ -17,7 +17,9 @@ import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.analyzer.models.builtin._
 import kr.ac.kaist.safe.nodes.cfg.CFG
 import kr.ac.kaist.safe.util._
-import scala.collection.immutable.{ HashMap }
+import kr.ac.kaist.safe.xwidl.dafny.Dafny
+
+import scala.collection.immutable.HashMap
 
 object Initialize {
   def apply(cfg: CFG): AbsState = {

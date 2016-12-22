@@ -46,6 +46,12 @@ case object LessEq extends BiOp {
 case object And extends BiOp {
   override def toString: String = "&&"
 }
+case object Minus extends BiOp {
+  override def toString: String = "-"
+}
+case object Plus extends BiOp {
+  override def toString: String = "+"
+}
 
 sealed trait Literal extends Pack
 

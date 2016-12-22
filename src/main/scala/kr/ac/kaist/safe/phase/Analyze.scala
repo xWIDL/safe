@@ -16,12 +16,14 @@ import kr.ac.kaist.safe.SafeConfig
 import kr.ac.kaist.safe.analyzer._
 import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils._
+import kr.ac.kaist.safe.analyzer.models.builtin._
 import kr.ac.kaist.safe.analyzer.console.Console
 import kr.ac.kaist.safe.analyzer.html_debugger.HTMLWriter
 import kr.ac.kaist.safe.errors.error.NoChoiceError
 import kr.ac.kaist.safe.LINE_SEP
 import kr.ac.kaist.safe.nodes.cfg.CFG
 import kr.ac.kaist.safe.util._
+import kr.ac.kaist.safe.xwidl.dafny.Dafny
 
 // Analyze phase
 case object Analyze extends PhaseObj[CFG, AnalyzeConfig, (CFG, Int, CallContext, Semantics)] {
@@ -42,6 +44,7 @@ case object Analyze extends PhaseObj[CFG, AnalyzeConfig, (CFG, Int, CallContext,
       config.AbsString,
       DefaultLoc(cfg)
     )
+
     var initSt = Initialize(cfg)
 
     // handling test mode
