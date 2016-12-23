@@ -9,7 +9,7 @@ import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
 import kr.ac.kaist.safe.xwidl.dafny.Dafny
 
 object ObjBuilder {
-  var dafny = new Dafny("", List(BuiltinMath))
+  var dafny = new Dafny("/home/zz/xwidl/dafny/Binaries/dafny", List(BuiltinMath))
 
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
@@ -22,15 +22,6 @@ object ObjBuilder {
               // A rough check: If all arguments type-match, then return a most general
               // representation of the returned type
               val h = st.heap
-              val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
-                case (arg, i) => {
-                  val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                  arg.ty match {
-                    case TyNum => Predicate("x", TyNum, argVal.pvalue.gamma2("x"))
-                    // FIXME: other cases
-                  }
-                }
-              }).toList
 
               val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
                 case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absVal)
@@ -40,7 +31,17 @@ object ObjBuilder {
                 .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
 
               if (argsMatch.forall({ case (_, matched) => matched })) {
-                dafny.call(interface.name, name, absArgs)
+
+                val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
+                  case (arg, i) => {
+                    val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
+                    Predicate("x", arg.ty, argVal.pvalue.gamma2("x"))
+                  }
+                }).toList
+
+                println(absArgs)
+
+                dafny.call(interface.name, name, argPreds, op.retTy)
 
                 op.absSemOpt match {
                   case Some(sem) => sem(st, absArgs)

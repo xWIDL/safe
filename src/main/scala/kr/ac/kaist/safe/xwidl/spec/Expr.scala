@@ -12,8 +12,7 @@ case class IfThenElseExpr(
 ) extends Expr {
 
   def pack: Doc =
-    text("if") <> parens(cond.pack) <+>
-      text("then") <+> braces(thenBranch.pack) <+> text("else") <+> braces(elseBranch.pack)
+    text("if") <+> cond.pack <+> text("then") <+> thenBranch.pack <+> text("else") <+> elseBranch.pack
 }
 
 case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
@@ -32,7 +31,7 @@ sealed trait BiOp extends Pack {
 }
 
 case object EqOp extends BiOp {
-  override def toString: String = "="
+  override def toString: String = "=="
 }
 case object GreaterThan extends BiOp {
   override def toString: String = ">"
@@ -58,7 +57,9 @@ sealed trait Literal extends Pack
 case class PrimInt(i: Int) extends Literal {
   def pack: Doc = text(i.toString)
 }
-
+case class PrimNum(i: Float) extends Literal {
+  def pack: Doc = text(i.toString)
+}
 case class PrimBool(b: Boolean) extends Literal {
   def pack: Doc = text(b.toString)
 }
