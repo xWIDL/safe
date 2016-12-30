@@ -24,7 +24,7 @@ object ObjBuilder {
               val h = st.heap
 
               val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
-                case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absVal)
+                case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
               }).toList
 
               val absArgs: List[AbsValue] = List.range(0, op.args.length)
@@ -39,13 +39,13 @@ object ObjBuilder {
                   }
                 }).toList
 
-                println(absArgs)
+                // println(absArgs)
 
-                dafny.call(interface.name, name, argPreds, op.retTy)
+                // dafny.call(interface.name, name, argPreds, op.retTy)
 
                 op.absSemOpt match {
                   case Some(sem) => sem(st, absArgs)
-                  case None => op.retTy.absVal
+                  case None => op.retTy.absTopVal
                 }
               } else {
                 // Print out what is wrong

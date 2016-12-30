@@ -51,7 +51,7 @@ class Dafny(
     mainStmts.+=(CallStmt(ivar, fname, argVars, retTy, mainUid))
     mainUid += 1
 
-    ask() match {
+    ask(query) match {
       case Verified => {
         println("Verified")
         Some(DefaultNull.Top)
@@ -63,6 +63,16 @@ class Dafny(
     }
   }
 
+  def assert(e: Expr): Result = {
+
+    val mainDoc: Doc = text("method Main()")
+    braces(text("assert(") <> e.pack <> text(");"))
+
+    val queryStr = showDoc(120, mainDoc)
+
+    ask(queryStr)
+  }
+
   def query: String = {
     val ifaces: Doc = interfaces.map(_.pack).fold(nil)((a, b) => a </> b)
     val argsStr: List[Doc] = mainArgs.map({ case (k, v) => text(k + " : " + v) }).toList
@@ -72,11 +82,10 @@ class Dafny(
     showDoc(100, ifaces </> mainDoc)
   }
 
-  def ask(): Result = {
+  def ask(queryStr: String): Result = {
     val tempFile = File.createTempFile("xwidl", ".dfy")
     val writer = new FileWriter(tempFile)
-    val q = query
-    writer.write(q)
+    writer.write(queryStr)
     writer.flush()
     writer.close()
 
@@ -94,10 +103,10 @@ class Dafny(
       if (output.startsWith("Dafny program verifier finished with")) {
         Verified
       } else {
-        Failed(output + q)
+        Failed(output + queryStr)
       }
     } else {
-      Failed(output + stderrStream.toString + q)
+      Failed(output + stderrStream.toString + queryStr)
     }
   }
 }

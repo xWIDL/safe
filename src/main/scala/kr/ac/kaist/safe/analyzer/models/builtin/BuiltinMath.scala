@@ -34,6 +34,7 @@ object BuiltinMath extends Interface(
     "SQRT1_2" -> Num(0.7071067811865476),
     "SQRT2" -> Num(1.4142135623730951)
   ),
+  attrs = HashMap(),
 
   // FIXME: default to T, F, T
   operations = HashMap(

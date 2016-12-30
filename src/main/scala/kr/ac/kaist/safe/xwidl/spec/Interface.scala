@@ -10,6 +10,7 @@ case class Interface(
     name: String,
     kind: InterfaceKind,
     constants: HashMap[String, PValue],
+    attrs: HashMap[String, Type],
     /* NOTE: Constants will not be packed;
        instead, it will be directly inlined when needed.
        See ObjBuilder. */
@@ -20,6 +21,8 @@ case class Interface(
     text("class") <+> text(name) <+>
       braces(stack(operations.values.map(_.pack).toList))
   }
+
+  def getAttrType(attr: String): Option[Type] = this.attrs.get(attr)
 }
 
 sealed trait InterfaceKind
