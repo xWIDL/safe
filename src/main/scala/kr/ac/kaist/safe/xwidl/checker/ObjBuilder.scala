@@ -5,6 +5,7 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.xwidl.spec._
 import kr.ac.kaist.safe.analyzer._
+import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
 import kr.ac.kaist.safe.analyzer.domain.DefaultObject.ObjMap
 import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
 import kr.ac.kaist.safe.xwidl.dafny.Dafny
@@ -36,40 +37,52 @@ object ObjBuilder {
                 case ((h, value, excSet), loc) => {
                   val thisObj = h.get(loc)
 
-                  val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
-                    case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
-                  }).toList
+                  val length = Helper.propLoad(args, Set(AbsString("length")), h).pvalue.numval
 
-                  val absArgs: List[AbsValue] = List.range(0, op.args.length)
-                    .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
-
-                  if (argsMatch.forall({ case (_, matched) => matched })) {
-
-                    val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
-                      case (arg, i) => {
-                        val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                        PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
-                      }
+                  val actualLen: AbsNumber = AbsNumber(op.args.length)
+                  if (!(actualLen <= length)) {
+                    println("[WARNING] unmatched argument number")
+                    (h, DefaultNull.Top, excSet)
+                  } else {
+                    val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
+                      case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
                     }).toList
 
-                    op.absSemOpt match {
-                      case Some(sem) => (h, sem(st, absArgs), excSet)
-                      case None => {
+                    val absArgs: List[AbsValue] = List.range(0, op.args.length)
+                      .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
 
-                        val (retVal, thisObj2) = op.call(dafny, st, thisObj, interface, absArgs) // TODO: Update this
+                    if (argsMatch.forall({ case (_, matched) => matched })) {
 
-                        (h.update(loc, thisObj2), if (retVal.pvalue != null) { retVal + value } else { value }, excSet) // TODO: why pvalue will be null?
+                      val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
+                        case (arg, i) => {
+                          val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
+                          PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
+                        }
+                      }).toList
+
+                      op.absSemOpt match {
+                        case Some(sem) => (h, sem(st, absArgs), excSet)
+                        case None => {
+
+                          val (retVal, thisObj2) = op.call(dafny, st, thisObj, interface, absArgs)
+
+                          (h.update(loc, thisObj2), if (retVal.pvalue != null) {
+                            retVal + value
+                          } else {
+                            value
+                          }, excSet) // TODO: why pvalue will be null?
+                        }
                       }
+                    } else {
+                      // Print out what is wrong
+                      argsMatch.filter({ case (i, matched) => !matched }).foreach({
+                        case (i, _) => {
+                          println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
+                            s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
+                        }
+                      })
+                      (h, DefaultNull.Top, excSet)
                     }
-                  } else {
-                    // Print out what is wrong
-                    argsMatch.filter({ case (i, matched) => !matched }).foreach({
-                      case (i, _) => {
-                        println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
-                          s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
-                      }
-                    })
-                    (h, DefaultNull.Top, excSet)
                   }
                 }
               }
