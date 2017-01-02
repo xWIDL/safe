@@ -78,58 +78,70 @@ object ObjBuilder {
     )
   }
 
+  def buildProtoFunc(interface: Interface): FuncModel = {
+    FuncModel(
+      name = interface.name,
+      // TODO: code
+      // TODO: construct
+      protoModel = Some(buildPrototype(interface), F, F, F)
+    )
+  }
+
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
-      interface.name,
-      interface.constants.map({ case (name, pVal) => NormalProp(name, PrimModel(DefaultPValue(pVal)), F, F, F) }).toList ++
-        interface.operations.map({
-          case (name, op) => NormalProp(name, FuncModel(
-            name = interface.name + '.' + name,
-            code = PureCode(argLen = op.args.length, (args, st) => {
-              // A rough check: If all arguments type-match, then return a most general
-              // representation of the returned type
-              val h = st.heap
+      name = interface.name,
+      props = interface.constants.map({
+      case (name, pVal) =>
+        NormalProp(name, PrimModel(DefaultPValue(pVal)), F, F, F)
+    }).toList ++
+      interface.operations.map({
+        case (name, op) => NormalProp(name, FuncModel(
+          name = interface.name + '.' + name,
+          code = PureCode(argLen = op.args.length, (args, st) => {
+            // A rough check: If all arguments type-match, then return a most general
+            // representation of the returned type
+            val h = st.heap
 
-              val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
-                case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
+            val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
+              case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
+            }).toList
+
+            val absArgs: List[AbsValue] = List.range(0, op.args.length)
+              .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
+
+            if (argsMatch.forall({ case (_, matched) => matched })) {
+
+              val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
+                case (arg, i) => {
+                  val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
+                  Predicate("x", arg.ty, argVal.pvalue.gamma2("x"))
+                }
               }).toList
 
-              val absArgs: List[AbsValue] = List.range(0, op.args.length)
-                .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
+              // println(absArgs)
 
-              if (argsMatch.forall({ case (_, matched) => matched })) {
+              // op.call(dafny, st,)
+              // dafny.call(interface.name, name, argPreds, op.retTy)
 
-                val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
-                  case (arg, i) => {
-                    val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                    Predicate("x", arg.ty, argVal.pvalue.gamma2("x"))
-                  }
-                }).toList
-
-                // println(absArgs)
-
-                // op.call(dafny, st,)
-                // dafny.call(interface.name, name, argPreds, op.retTy)
-
-                op.absSemOpt match {
-                  case Some(sem) => sem(st, absArgs)
-                  case None => op.retTy.absTopVal
-                }
-              } else {
-                // Print out what is wrong
-                argsMatch.filter({ case (i, matched) => !matched }).foreach({
-                  case (i, _) => {
-                    println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
-                      s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
-                  }
-                })
-
-                // Then returned undefined
-                DefaultUndef.Top
+              op.absSemOpt match {
+                case Some(sem) => sem(st, absArgs)
+                case None => op.retTy.absTopVal
               }
-            })
-          ), T, F, T)
-        }).toList
+            } else {
+              // Print out what is wrong
+              argsMatch.filter({ case (i, matched) => !matched }).foreach({
+                case (i, _) => {
+                  println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
+                    s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
+                }
+              })
+
+              // Then returned undefined
+              DefaultUndef.Top
+            }
+          })
+        ), T, F, T)
+      }).toList
     )
   }
 }
