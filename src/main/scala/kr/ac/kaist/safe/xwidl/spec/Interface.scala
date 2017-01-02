@@ -2,7 +2,7 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.PValue
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.dafny.Pack
+import kr.ac.kaist.safe.xwidl.solver.Pack
 import kr.ac.kaist.safe.xwidl.pprint._
 
 import scala.collection.immutable.HashMap

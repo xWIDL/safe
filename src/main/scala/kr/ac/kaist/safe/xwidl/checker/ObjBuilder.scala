@@ -5,15 +5,14 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.xwidl.spec._
 import kr.ac.kaist.safe.analyzer._
-import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
 import kr.ac.kaist.safe.analyzer.domain.DefaultObject.ObjMap
 import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
-import kr.ac.kaist.safe.xwidl.dafny.Dafny
+import kr.ac.kaist.safe.xwidl.solver.Solver
 
 import scala.collection.immutable.HashSet
 
 object ObjBuilder {
-  var dafny = new Dafny("/home/zz/xwidl/dafny/Binaries/dafny", List(BuiltinMath))
+  var solver = new Solver(List(BuiltinMath))
 
   def buildPrototype(interface: Interface): ObjModel = {
     val opHashSet = interface.operations.values.map(_.objAddr).toSet
@@ -53,18 +52,11 @@ object ObjBuilder {
 
                     if (argsMatch.forall({ case (_, matched) => matched })) {
 
-                      val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
-                        case (arg, i) => {
-                          val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                          PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
-                        }
-                      }).toList
-
                       op.absSemOpt match {
                         case Some(sem) => (h, sem(st, absArgs), excSet)
                         case None => {
 
-                          val (retVal, thisObj2) = op.call(dafny, st, thisObj, interface, absArgs)
+                          val (retVal, thisObj2) = op.call(solver, st, thisObj, interface, absArgs)
 
                           (h.update(loc, thisObj2), if (retVal.pvalue != null) {
                             retVal + value
@@ -131,6 +123,7 @@ object ObjBuilder {
     )
   }
 
+  // TODO: merge two ways of building methods?
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
       name = interface.name,
@@ -154,18 +147,6 @@ object ObjBuilder {
               .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
 
             if (argsMatch.forall({ case (_, matched) => matched })) {
-
-              val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
-                case (arg, i) => {
-                  val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                  PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
-                }
-              }).toList
-
-              // println(absArgs)
-
-              // op.call(dafny, st,)
-              // dafny.call(interface.name, name, argPreds, op.retTy)
 
               op.absSemOpt match {
                 case Some(sem) => sem(st, absArgs)

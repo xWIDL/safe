@@ -18,8 +18,6 @@ trait AbsDomain[C, Self <: AbsDomain[C, _]] extends Domain[Self] {
   // concretization
   def gamma: ConSet[C]
 
-  def gamma2(s: String): Expr = LitExpr(LitBool(false))
-
   // get concrete value if |gamma(this)| = 1
   def getSingle: ConSingle[C]
 }

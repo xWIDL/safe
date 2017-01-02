@@ -3,7 +3,7 @@ package kr.ac.kaist.safe.xwidl.spec
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultNull }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.dafny.{ Dafny, Pack, Verified }
+import kr.ac.kaist.safe.xwidl.solver.{ Solver, Pack, Verified }
 import kr.ac.kaist.safe.xwidl.pprint._
 
 case class OperationException(s: String) extends Exception(s)
@@ -37,7 +37,7 @@ case class Operation(
     })
   }
 
-  def call(dafny: Dafny, st: AbsState, selfObj: AbsObject,
+  def call(dafny: Solver, st: AbsState, selfObj: AbsObject,
     selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
     // TODO 1. check the prerequisite
 

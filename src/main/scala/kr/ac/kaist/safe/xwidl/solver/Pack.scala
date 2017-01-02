@@ -1,4 +1,4 @@
-package kr.ac.kaist.safe.xwidl.dafny
+package kr.ac.kaist.safe.xwidl.solver
 
 import kr.ac.kaist.safe.xwidl.pprint.Doc
 

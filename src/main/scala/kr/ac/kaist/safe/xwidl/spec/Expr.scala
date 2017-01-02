@@ -1,7 +1,7 @@
 package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.AbsValue
-import kr.ac.kaist.safe.xwidl.dafny.{ Pack, PackZ3 }
+import kr.ac.kaist.safe.xwidl.solver.{ Pack, PackZ3 }
 import kr.ac.kaist.safe.xwidl.pprint._
 
 sealed trait Expr extends Pack with PackZ3 {
