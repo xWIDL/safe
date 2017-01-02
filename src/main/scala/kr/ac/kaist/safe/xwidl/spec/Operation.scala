@@ -9,12 +9,12 @@ import scala.collection.JavaConverters._
 
 case class Operation(
     name: String,
-    args: List[Argument],
+    args: List[Argument] = List(),
     retTy: Type,
     objAddr: Address,
-    requires: Expr,
-    ensures: Expr,
-    absSemOpt: Option[(AbsState, List[AbsValue]) => AbsValue]
+    requires: Expr = LitExpr(LitBool(true)),
+    ensures: Expr = LitExpr(LitBool(true)),
+    absSemOpt: Option[(AbsState, List[AbsValue]) => AbsValue] = None
 ) extends Pack {
   def pack: Doc = {
     text("method") <+> text(name) <>

@@ -50,9 +50,9 @@ object DefaultNumber extends AbsNumberUtil {
     }
 
     override def gamma2(s: String): Expr = this match {
-      case Bot => LitExpr(PrimBool(false))
-      case Inf => LitExpr(PrimBool(false)) // FIXME
-      case PosInf => BiOpExpr(VarExpr("x"), GreaterThan, LitExpr(PrimInt(0))) // FIXME: Not sound
+      case Bot => LitExpr(LitBool(false))
+      case Inf => LitExpr(LitBool(false)) // FIXME
+      case PosInf => BiOpExpr(VarExpr("x"), GreaterThan, LitExpr(LitInt(0))) // FIXME: Not sound
       // FIXME: more cases
     }
 

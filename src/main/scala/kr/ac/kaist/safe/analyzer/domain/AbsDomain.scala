@@ -11,14 +11,14 @@
 
 package kr.ac.kaist.safe.analyzer.domain
 
-import kr.ac.kaist.safe.xwidl.spec.{ Expr, LitExpr, PrimBool }
+import kr.ac.kaist.safe.xwidl.spec.{ Expr, LitExpr, LitBool }
 
 // abstract domain
 trait AbsDomain[C, Self <: AbsDomain[C, _]] extends Domain[Self] {
   // concretization
   def gamma: ConSet[C]
 
-  def gamma2(s: String): Expr = LitExpr(PrimBool(false))
+  def gamma2(s: String): Expr = LitExpr(LitBool(false))
 
   // get concrete value if |gamma(this)| = 1
   def getSingle: ConSingle[C]

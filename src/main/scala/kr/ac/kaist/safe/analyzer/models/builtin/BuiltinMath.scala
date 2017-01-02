@@ -42,11 +42,11 @@ object BuiltinMath extends Interface(
       args = List(Argument("x", TyNum)),
       retTy = TyNum,
       objAddr = SystemAddr("Math.prototype.abs<object>"),
-      requires = LitExpr(PrimBool(true)),
+      requires = LitExpr(LitBool(true)),
       ensures =
         IfThenElseExpr(
-          BiOpExpr(VarExpr("x"), LessEq, LitExpr(PrimNum(0))),
-          BiOpExpr(VarExpr("ret"), EqOp, BiOpExpr(LitExpr(PrimNum(0)), Minus, VarExpr("x"))),
+          BiOpExpr(VarExpr("x"), LessEq, LitExpr(LitNum(0))),
+          BiOpExpr(VarExpr("ret"), EqOp, BiOpExpr(LitExpr(LitNum(0)), Minus, VarExpr("x"))),
           BiOpExpr(VarExpr("ret"), EqOp, VarExpr("x"))
         ),
       absSemOpt = Some({

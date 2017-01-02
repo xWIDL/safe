@@ -17,6 +17,7 @@ import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.analyzer._
 import kr.ac.kaist.safe.util.NodeUtil
 import kr.ac.kaist.safe.xwidl.checker.ObjBuilder
+import kr.ac.kaist.safe.xwidl.spec.BuiltinFoo
 
 object BuiltinGlobal extends ObjModel(
   name = "Global",
@@ -132,6 +133,8 @@ object BuiltinGlobal extends ObjModel(
     NormalProp("Math", ObjBuilder.buildProtoFunc(BuiltinMath), T, F, T),
     // 15.1.5.2 JSON(...)
     NormalProp("JSON", BuiltinJSON, T, F, T),
+
+    NormalProp("Foo", ObjBuilder.buildProtoFunc(BuiltinFoo), T, F, T),
 
     NormalProp(NodeUtil.GLOBAL_NAME, SelfModel, F, F, F),
     NormalProp(NodeUtil.VAR_TRUE, PrimModel(true), F, F, F)

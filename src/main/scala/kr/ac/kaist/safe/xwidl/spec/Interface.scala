@@ -10,14 +10,14 @@ import scala.collection.immutable.HashMap
 case class Interface(
     name: String,
     kind: InterfaceKind,
-    constants: HashMap[String, PValue],
+    constants: HashMap[String, PValue] = HashMap(),
     instanceAddr: Address,
-    attrs: HashMap[String, Type],
+    attrs: HashMap[String, Type] = HashMap(),
     /* NOTE: Constants will not be packed;
        instead, it will be directly inlined when needed.
        See ObjBuilder. */
 
-    operations: HashMap[String, Operation]
+    operations: HashMap[String, Operation] = HashMap()
 ) extends Pack {
   def pack: Doc = {
     text("class") <+> text(name) <+>
@@ -30,3 +30,4 @@ case class Interface(
 sealed trait InterfaceKind
 
 case object ECMAScriptInterface extends InterfaceKind
+case object WebAPIInterface extends InterfaceKind

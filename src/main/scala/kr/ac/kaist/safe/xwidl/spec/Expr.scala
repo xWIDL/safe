@@ -43,10 +43,19 @@ case class VarExpr(name: String) extends Expr {
 
   def subst(x: String, v: AbsValue): Expr =
     if (x == name) {
-      LitExpr(PrimAbs(v))
+      LitExpr(LitAbs(v))
     } else {
       this
     }
+}
+
+case class AccessExpr(obj: Expr, attr: String) extends Expr {
+  def pack: Doc = obj.pack <> text("." + attr)
+
+  def freeVars: Set[String] = obj.freeVars
+
+  def subst(name: String, v: AbsValue): Expr =
+    AccessExpr(obj.subst(name, v), attr)
 }
 
 case class LitExpr(lit: Literal) extends Expr {
@@ -85,15 +94,15 @@ case object Plus extends BiOp {
 
 sealed trait Literal extends Pack
 
-case class PrimInt(i: Int) extends Literal {
+case class LitInt(i: Int) extends Literal {
   def pack: Doc = text(i.toString)
 }
-case class PrimNum(i: Float) extends Literal {
+case class LitNum(i: Double) extends Literal {
   def pack: Doc = text(i.toString)
 }
-case class PrimBool(b: Boolean) extends Literal {
+case class LitBool(b: Boolean) extends Literal {
   def pack: Doc = text(b.toString)
 }
-case class PrimAbs(a: AbsValue) extends Literal {
+case class LitAbs(a: AbsValue) extends Literal {
   def pack: Doc = text(a.toString)
 }
