@@ -13,7 +13,6 @@ package kr.ac.kaist.safe.analyzer.models.builtin
 
 import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils.{ AbsValue, _ }
-import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.analyzer._
 import kr.ac.kaist.safe.util.SystemAddr
 import kr.ac.kaist.safe.xwidl.spec._
@@ -24,8 +23,7 @@ object BuiltinMath extends Interface(
   name = "Math",
   kind = ECMAScriptInterface,
   constants = HashMap(
-    // InternalProp(IClass, PrimModel("Math")),
-    // FIXME: default to be F, F, F
+    // TODO: default to be F F F, but should be customizable
     "E" -> Num(2.7182818284590452354),
     "LN10" -> Num(2.302585092994046),
     "LN2" -> Num(0.6931471805599453),
@@ -35,8 +33,8 @@ object BuiltinMath extends Interface(
     "SQRT1_2" -> Num(0.7071067811865476),
     "SQRT2" -> Num(1.4142135623730951)
   ),
+  instanceAddr = SystemAddr("Math<instance>"),
   attrs = HashMap(),
-
   // FIXME: default to T, F, T
   operations = HashMap(
     "abs" -> Operation(

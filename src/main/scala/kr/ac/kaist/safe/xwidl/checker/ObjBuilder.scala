@@ -8,6 +8,8 @@ import kr.ac.kaist.safe.analyzer._
 import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
 import kr.ac.kaist.safe.xwidl.dafny.Dafny
 
+import scala.collection.immutable.HashSet
+
 object ObjBuilder {
   var dafny = new Dafny("/home/zz/xwidl/dafny/Binaries/dafny", List(BuiltinMath))
 
@@ -81,8 +83,23 @@ object ObjBuilder {
   def buildProtoFunc(interface: Interface): FuncModel = {
     FuncModel(
       name = interface.name,
-      // TODO: code
-      // TODO: construct
+      // TODO: more general construct
+      construct = Some(BasicCode(
+        argLen = 0,
+        addrSet = HashSet(interface.instanceAddr),
+        code = (args, st) => {
+          val h = st.heap
+
+          val retObj = AbsObject.newObject
+
+          val arrAddr = interface.instanceAddr
+          val state = st.oldify(arrAddr)
+          val arrLoc = Loc(arrAddr, Recent)
+          val retH = state.heap.update(arrLoc, retObj.oldify(arrAddr))
+          val excSt = state.raiseException(ExcSetEmpty)
+          (AbsState(retH, state.context), excSt, AbsLoc(arrLoc))
+        }
+      )),
       protoModel = Some(buildPrototype(interface), F, F, F)
     )
   }

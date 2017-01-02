@@ -129,7 +129,7 @@ object BuiltinGlobal extends ObjModel(
     // 15.1.4.15 URIError(...)
     NormalProp("URIError", BuiltinURIError, T, F, T),
     // 15.1.5.1 Math(...)
-    NormalProp("Math", ObjBuilder.buildObj(BuiltinMath), T, F, T),
+    NormalProp("Math", ObjBuilder.buildProtoFunc(BuiltinMath), T, F, T),
     // 15.1.5.2 JSON(...)
     NormalProp("JSON", BuiltinJSON, T, F, T),
 
