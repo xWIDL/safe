@@ -34,7 +34,6 @@ object BuiltinMath extends Interface(
     "SQRT2" -> Num(1.4142135623730951)
   ),
   instanceAddr = SystemAddr("Math<instance>"),
-  attrs = HashMap(),
   // FIXME: default to T, F, T
   operations = HashMap(
     "abs" -> Operation(

@@ -49,15 +49,6 @@ case class VarExpr(name: String) extends Expr {
     }
 }
 
-case class AccessExpr(obj: Expr, attr: String) extends Expr {
-  def pack: Doc = obj.pack <> text("." + attr)
-
-  def freeVars: Set[String] = obj.freeVars
-
-  def subst(name: String, v: AbsValue): Expr =
-    AccessExpr(obj.subst(name, v), attr)
-}
-
 case class LitExpr(lit: Literal) extends Expr {
   def pack: Doc = lit.pack
 

@@ -1,11 +1,12 @@
 package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultNull }
+import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.Address
 import kr.ac.kaist.safe.xwidl.dafny.{ Dafny, Pack, Verified }
 import kr.ac.kaist.safe.xwidl.pprint._
 
-import scala.collection.JavaConverters._
+case class OperationException(s: String) extends Exception(s)
 
 case class Operation(
     name: String,
@@ -36,20 +37,25 @@ case class Operation(
     })
   }
 
-  def call(dafny: Dafny, st: AbsState, self: AbsObject,
-    selfIface: Interface, args: List[AbsValue]): AbsValue = {
+  def call(dafny: Dafny, st: AbsState, selfObj: AbsObject,
+    selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
     // TODO 1. check the prerequisite
 
     val absValLists = ensures.freeVars.map({
       case "ret" => (retTy.absValList, "ret")
+      case s if s.startsWith("old_this.") => {
+        val attr = s.stripPrefix("old_this.")
+        (List(selfObj.Get(s, st.heap)), s)
+      }
       case s if s.startsWith("this.") => {
         val attr = s.stripPrefix("this.")
         selfIface.getAttrType(attr) match {
           case Some(ty) => (ty.absValList, s)
-          case None => throw new Exception(s"Unknown attribute $attr of ${selfIface.name} interface")
+          case None => return (DefaultNull.Top, selfObj)
         }
       }
-      case s => throw new Exception(s"Unknown free var $s")
+      // TODO: args
+      case s => return (DefaultNull.Top, selfObj)
     }).toList
 
     val selModeStream = genSelMode(absValLists)
@@ -61,15 +67,25 @@ case class Operation(
       })
 
       dafny.assert(ensuresClosed) match {
-        case Verified => s.find({ case (_, name) => name == "ret" }) match {
-          case Some((retVal, _)) => return retVal
-          case None => return retTy.absTopVal
+        case Verified => {
+          val updatedProps = s.filter({ case (_, name) => name.startsWith("this.") })
+          val selfObj2 = updatedProps.foldLeft(selfObj)({
+            case (selfObj, (propVal, propName)) => {
+              val prop = propName.stripPrefix("this.")
+              val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal, true, st.heap) // TODO: exception
+              selfObj2
+            }
+          })
+          s.find({ case (_, name) => name == "ret" }) match {
+            case Some((retVal, _)) => return (retVal, selfObj2)
+            case None => return (retTy.absTopVal, selfObj2)
+          }
         }
         case _ => ()
       }
     }
 
-    DefaultNull.Top
+    (DefaultNull.Top, selfObj)
   }
 }
 

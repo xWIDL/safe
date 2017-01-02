@@ -5,6 +5,7 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.xwidl.spec._
 import kr.ac.kaist.safe.analyzer._
+import kr.ac.kaist.safe.analyzer.domain.DefaultObject.ObjMap
 import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinMath
 import kr.ac.kaist.safe.xwidl.dafny.Dafny
 
@@ -19,7 +20,7 @@ object ObjBuilder {
       name = s"${interface.name}.prototype",
       props =
       // attributes
-      interface.attrs.map({ case (name, ty) => NormalProp(name, PrimModel(ty.absTopPVal), T, F, T) }).toList ++
+      interface.attrs.map({ case (name, (ty, pval)) => NormalProp(name, PrimModel(AbsPValue(pval)), T, F, T) }).toList ++
         // operations (which can refer to "this")
         interface.operations.map({
           case (name, op) => NormalProp(name, FuncModel(
@@ -54,8 +55,8 @@ object ObjBuilder {
                     op.absSemOpt match {
                       case Some(sem) => (h, sem(st, absArgs), excSet)
                       case None => {
-                        val retVal = op.call(dafny, st, thisObj, interface, absArgs) // TODO: Update this
-                        (h, retVal, excSet)
+                        val (retVal, thisObj2) = op.call(dafny, st, thisObj, interface, absArgs) // TODO: Update this
+                        (h.update(loc, thisObj2), retVal, excSet)
                       }
                     }
                   } else {
@@ -81,6 +82,7 @@ object ObjBuilder {
   }
 
   def buildProtoFunc(interface: Interface): FuncModel = {
+    val protoObj = buildPrototype(interface)
     FuncModel(
       name = interface.name,
       // TODO: more general construct
@@ -90,7 +92,17 @@ object ObjBuilder {
         code = (args, st) => {
           val h = st.heap
 
-          val retObj = AbsObject.newObject
+          val o: AbsObject = ObjMap(AbsMapEmpty)
+          val o2 = o
+            .update(IClass, InternalValueUtil(AbsString(interface.name)))
+            .update(IPrototype, InternalValueUtil(protoObj.loc))
+            .update(IExtensible, InternalValueUtil(AbsBool(true)))
+
+          val retObj = interface.attrs.foldLeft(o2)({
+            case (o, (name, (_, pval))) => {
+              o.update(name, AbsDataProp(AbsValue(pval), AbsBool(true), AbsBool(false), AbsBool(true)))
+            }
+          })
 
           val arrAddr = interface.instanceAddr
           val state = st.oldify(arrAddr)
@@ -100,7 +112,7 @@ object ObjBuilder {
           (AbsState(retH, state.context), excSt, AbsLoc(arrLoc))
         }
       )),
-      protoModel = Some(buildPrototype(interface), F, F, F)
+      protoModel = Some(protoObj, F, F, F)
     )
   }
 

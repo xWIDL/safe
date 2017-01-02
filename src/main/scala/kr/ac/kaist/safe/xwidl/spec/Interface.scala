@@ -12,7 +12,7 @@ case class Interface(
     kind: InterfaceKind,
     constants: HashMap[String, PValue] = HashMap(),
     instanceAddr: Address,
-    attrs: HashMap[String, Type] = HashMap(),
+    attrs: HashMap[String, (Type, PValue)] = HashMap(),
     /* NOTE: Constants will not be packed;
        instead, it will be directly inlined when needed.
        See ObjBuilder. */
@@ -24,7 +24,11 @@ case class Interface(
       braces(stack(operations.values.map(_.pack).toList))
   }
 
-  def getAttrType(attr: String): Option[Type] = this.attrs.get(attr)
+  def getAttrType(attr: String): Option[Type] =
+    this.attrs.get(attr) match {
+      case Some((ty, _)) => Some(ty)
+      case _ => None
+    }
 }
 
 sealed trait InterfaceKind
