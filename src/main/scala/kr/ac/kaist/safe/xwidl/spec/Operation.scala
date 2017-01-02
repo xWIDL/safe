@@ -29,8 +29,8 @@ case class Operation(
   }
 
   // TODO: meet cases?
-  private def genSelMode(absValLists: List[(List[AbsValue], String)]): List[List[(AbsValue, String)]] = {
-    absValLists.foldRight(List(List[(AbsValue, String)]()))({
+  private def genSelMode(concValLists: List[(List[ConcVal], String)]): List[List[(ConcVal, String)]] = {
+    concValLists.foldRight(List(List[(ConcVal, String)]()))({
       case ((vals, name), lss) => {
         lss.flatMap(ls => vals.map(v => (v, name) :: ls))
       }
@@ -41,28 +41,37 @@ case class Operation(
     selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
     // TODO 1. check the prerequisite
 
-    val absValLists = ensures.freeVars.map({
-      case "ret" => (retTy.absValList, "ret")
+    val concValLists: List[Option[(List[ConcVal], String)]] = ensures.freeVars.map({
+      case "ret" => Some(retTy.concValList, "ret")
       case s if s.startsWith("old_this.") => {
         val attr = s.stripPrefix("old_this.")
-        (List(selfObj.Get(s, st.heap)), s)
+        Some(List(PreciseVal(selfObj.Get(attr, st.heap))), s)
       }
       case s if s.startsWith("this.") => {
         val attr = s.stripPrefix("this.")
         selfIface.getAttrType(attr) match {
-          case Some(ty) => (ty.absValList, s)
-          case None => return (DefaultNull.Top, selfObj)
+          case Some(ty) => Some(ty.concValList, s)
+          case None => None
         }
       }
       // TODO: args
-      case s => return (DefaultNull.Top, selfObj)
+      case _ => None
     }).toList
 
-    val selModeStream = genSelMode(absValLists)
+    if (!concValLists.forall(_.isDefined)) {
+      return (DefaultNull.Top, selfObj)
+    }
+
+    val selModeStream = genSelMode(concValLists.flatten)
     for (s <- selModeStream) {
       val ensuresClosed = s.foldLeft(ensures)({
-        case (e, (v, name)) => {
-          e.subst(name, v)
+        case (e, (concVal, y)) => {
+          concVal match {
+            case PredicateVal(x, ty, constraint, _) => {
+              ExistsExpr(x, ty, BiOpExpr(e.subst(y, VarExpr(x)), And, constraint)) // TODO: alpha conversion
+            }
+            case PreciseVal(v) => e.subst(y, LitExpr(LitAbs(v)))
+          }
         }
       })
 
@@ -72,12 +81,12 @@ case class Operation(
           val selfObj2 = updatedProps.foldLeft(selfObj)({
             case (selfObj, (propVal, propName)) => {
               val prop = propName.stripPrefix("this.")
-              val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal, true, st.heap) // TODO: exception
+              val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal.alpha, true, st.heap) // TODO: exception
               selfObj2
             }
           })
           s.find({ case (_, name) => name == "ret" }) match {
-            case Some((retVal, _)) => return (retVal, selfObj2)
+            case Some((retVal, _)) => return (retVal.alpha, selfObj2)
             case None => return (retTy.absTopVal, selfObj2)
           }
         }

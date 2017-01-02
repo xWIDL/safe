@@ -45,18 +45,20 @@ object ObjBuilder {
 
                   if (argsMatch.forall({ case (_, matched) => matched })) {
 
-                    val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
+                    val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
                       case (arg, i) => {
                         val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                        Predicate("x", arg.ty, argVal.pvalue.gamma2("x"))
+                        PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
                       }
                     }).toList
 
                     op.absSemOpt match {
                       case Some(sem) => (h, sem(st, absArgs), excSet)
                       case None => {
+
                         val (retVal, thisObj2) = op.call(dafny, st, thisObj, interface, absArgs) // TODO: Update this
-                        (h.update(loc, thisObj2), retVal, excSet)
+
+                        (h.update(loc, thisObj2), if (retVal.pvalue != null) { retVal + value } else { value }, excSet) // TODO: why pvalue will be null?
                       }
                     }
                   } else {
@@ -140,10 +142,10 @@ object ObjBuilder {
 
             if (argsMatch.forall({ case (_, matched) => matched })) {
 
-              val argPreds: List[Predicate] = op.args.view.zipWithIndex.map({
+              val argPreds: List[ConcVal] = op.args.view.zipWithIndex.map({
                 case (arg, i) => {
                   val argVal = Helper.propLoad(args, Set(AbsString(i.toString)), h)
-                  Predicate("x", arg.ty, argVal.pvalue.gamma2("x"))
+                  PredicateVal("x", arg.ty, argVal.pvalue.gamma2("x"), argVal)
                 }
               }).toList
 

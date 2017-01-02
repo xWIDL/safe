@@ -8,7 +8,7 @@ object BuiltinFoo extends Interface(
   name = "Foo",
   kind = WebAPIInterface,
   instanceAddr = SystemAddr("Foo<instance>"),
-  attrs = HashMap("count" -> (TyNum, Num(0))),
+  attrs = HashMap("count" -> (TyInt, Num(0))),
   operations = HashMap("bump" -> Operation(
     name = "bump",
     retTy = TyVoid,
@@ -19,7 +19,7 @@ object BuiltinFoo extends Interface(
         BiOpExpr(
           VarExpr("old_this.count"),
           Plus,
-          LitExpr(LitNum(1))
+          LitExpr(LitInt(1))
         )
       )
   ))

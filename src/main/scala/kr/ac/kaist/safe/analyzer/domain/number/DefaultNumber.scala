@@ -50,10 +50,10 @@ object DefaultNumber extends AbsNumberUtil {
     }
 
     override def gamma2(s: String): Expr = this match {
-      case Bot => LitExpr(LitBool(false))
-      case Inf => LitExpr(LitBool(false)) // FIXME
-      case PosInf => BiOpExpr(VarExpr("x"), GreaterThan, LitExpr(LitInt(0))) // FIXME: Not sound
-      // FIXME: more cases
+      // FIXME: Maybe type info?....
+      case UInt => LitExpr(LitBool(true))
+      case NUInt => LitExpr(LitBool(true))
+      case _ => LitExpr(LitBool(false))
     }
 
     def isBottom: Boolean = this == Bot

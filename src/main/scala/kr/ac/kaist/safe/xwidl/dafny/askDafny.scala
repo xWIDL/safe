@@ -33,22 +33,25 @@ class Dafny(
   var mainArgs: mutable.HashMap[String, String] = mutable.HashMap() // FIXME: naive encoding of Dafny type
   var mainUid: Int = 0
 
-  def call(iname: String, fname: String, args: List[Predicate], retTy: Type): Option[AbsValue] = {
+  def call(iname: String, fname: String, args: List[ConcVal], retTy: Type): Option[AbsValue] = {
 
     val ivar = "global_" + iname
     if (mainArgs.get(ivar).isEmpty) {
       mainArgs += (ivar -> iname)
     }
 
-    val argVars = args.map(arg => {
-      val argvar = arg.binder + mainUid
-      mainUid += 1
-      mainArgs += (argvar -> showDoc(80, arg.binderTy.pack))
-      mainRequires.+=(arg.body)
-      argvar
+    val argReprs: List[String] = args.map({
+      case PredicateVal(binder, ty, body, _) => {
+        val argvar = binder + mainUid
+        mainUid += 1
+        mainArgs += (argvar -> showDoc(80, ty.pack))
+        mainRequires.+=(body)
+        argvar
+      }
+      case PreciseVal(v) => v.toString
     })
 
-    mainStmts.+=(CallStmt(ivar, fname, argVars, retTy, mainUid))
+    mainStmts.+=(CallStmt(ivar, fname, argReprs, retTy, mainUid))
     mainUid += 1
 
     ask(query) match {
@@ -65,12 +68,34 @@ class Dafny(
 
   def assert(e: Expr): Result = {
 
-    val mainDoc: Doc = text("method Main()")
-    braces(text("assert(") <> e.pack <> text(");"))
+    val doc: Doc = parens(text("assert") <+> e.packZ3) </> parens(text("check-sat"))
 
-    val queryStr = showDoc(120, mainDoc)
+    val queryStr = showDoc(120, doc)
 
-    ask(queryStr)
+    val tempFile = File.createTempFile("xwidl", ".z3")
+    val writer = new FileWriter(tempFile)
+    writer.write(queryStr)
+    writer.flush()
+    writer.close()
+
+    val stdoutStream = new ByteArrayOutputStream
+    val stderrStream = new ByteArrayOutputStream
+    val stdoutWriter = new PrintWriter(stdoutStream)
+    val stderrWriter = new PrintWriter(stderrStream)
+    val exitCode = ("z3 " + tempFile) ! ProcessLogger(stdoutWriter.println, stderrWriter.println)
+    stdoutWriter.close()
+    stderrWriter.close()
+
+    val output = stdoutStream.toString
+    if (exitCode == 0) {
+      if (output.startsWith("sat")) {
+        Verified
+      } else {
+        Failed(output + queryStr)
+      }
+    } else {
+      Failed(output + stderrStream.toString + queryStr)
+    }
   }
 
   def query: String = {

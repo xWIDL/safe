@@ -2,15 +2,15 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils._
-import kr.ac.kaist.safe.xwidl.dafny.Pack
+import kr.ac.kaist.safe.xwidl.dafny.{ Pack, PackZ3 }
 import kr.ac.kaist.safe.xwidl.pprint._
 
-sealed trait Type extends Pack {
+sealed trait Type extends Pack with PackZ3 {
   val absTopPVal: AbsPValue
 
   val absTopVal: AbsValue = AbsValue(absTopPVal)
 
-  def absValList: List[AbsValue]
+  def concValList: List[ConcVal]
 }
 
 sealed trait PrimType extends Type
@@ -20,10 +20,33 @@ case object TyNum extends PrimType {
 
   def pack: Doc = text("real")
 
-  def absValList: List[AbsValue] =
+  def concValList: List[ConcVal] =
     // it is really hard to imagine how to represent this in a constraint solver
     // Maybe full abstraction is *ultimately* the right way to go
-    List(DefaultNumber.Inf, DefaultNumber.UInt, DefaultNumber.NUInt)
+    List(
+      PredicateVal("x", TyNum, LitExpr(LitBool(true)), DefaultNumber.NUInt)
+    )
+
+  def packZ3: Doc = text("Real")
+}
+
+case object TyInt extends PrimType {
+  val absTopPVal: AbsPValue = DefaultNumber.Top
+
+  def pack: Doc = text("int")
+
+  def concValList: List[ConcVal] =
+    // it is really hard to imagine how to represent this in a constraint solver
+    // Maybe full abstraction is *ultimately* the right way to go
+    List(
+      PredicateVal(
+        "x", TyNum,
+        BiOpExpr(VarExpr("x"), GreaterEq, LitExpr(LitInt(0))),
+        DefaultNumber.UInt
+      )
+    )
+
+  def packZ3: Doc = text("Int")
 }
 
 case object TyVoid extends Type {
@@ -31,7 +54,9 @@ case object TyVoid extends Type {
 
   def pack: Doc = text("void")
 
-  def absValList: List[AbsValue] = List()
+  def concValList: List[ConcVal] = List()
+
+  def packZ3: Doc = text("Void") // this doesn't make much sense
 }
 
 object getPtype {
