@@ -1,6 +1,7 @@
 package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultNull }
+import kr.ac.kaist.safe.util.Address
 import kr.ac.kaist.safe.xwidl.dafny.{ Dafny, Pack, Verified }
 import kr.ac.kaist.safe.xwidl.pprint._
 
@@ -10,6 +11,7 @@ case class Operation(
     name: String,
     args: List[Argument],
     retTy: Type,
+    objAddr: Address,
     requires: Expr,
     ensures: Expr,
     absSemOpt: Option[(AbsState, List[AbsValue]) => AbsValue]

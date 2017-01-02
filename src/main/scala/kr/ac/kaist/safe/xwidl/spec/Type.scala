@@ -6,7 +6,9 @@ import kr.ac.kaist.safe.xwidl.dafny.Pack
 import kr.ac.kaist.safe.xwidl.pprint._
 
 sealed trait Type extends Pack {
-  val absTopVal: AbsValue
+  val absTopPVal: AbsPValue
+
+  val absTopVal: AbsValue = AbsValue(absTopPVal)
 
   def absValList: List[AbsValue]
 }
@@ -14,7 +16,7 @@ sealed trait Type extends Pack {
 sealed trait PrimType extends Type
 
 case object TyNum extends PrimType {
-  val absTopVal: AbsValue = AbsValue(AbsNumber.Top)
+  val absTopPVal: AbsPValue = DefaultNumber.Top
 
   def pack: Doc = text("real")
 
@@ -25,7 +27,7 @@ case object TyNum extends PrimType {
 }
 
 case object TyVoid extends Type {
-  val absTopVal: AbsValue = AbsValue(AbsUndef.Top)
+  val absTopPVal: AbsPValue = DefaultUndef.Top
 
   def pack: Doc = text("void")
 

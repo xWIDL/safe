@@ -15,6 +15,7 @@ import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils.{ AbsValue, _ }
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.analyzer._
+import kr.ac.kaist.safe.util.SystemAddr
 import kr.ac.kaist.safe.xwidl.spec._
 
 import scala.collection.immutable.HashMap
@@ -42,6 +43,7 @@ object BuiltinMath extends Interface(
       name = "abs",
       args = List(Argument("x", TyNum)),
       retTy = TyNum,
+      objAddr = SystemAddr("Math.prototype.abs<object>"),
       requires = LitExpr(PrimBool(true)),
       ensures =
         IfThenElseExpr(
