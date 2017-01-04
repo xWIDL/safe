@@ -16,8 +16,8 @@ import kr.ac.kaist.safe.analyzer.models.PredefLoc
 import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinGlobal
 import kr.ac.kaist.safe.LINE_SEP
 import kr.ac.kaist.safe.nodes.cfg._
-import kr.ac.kaist.safe.util.{ Address, SystemAddr }
-import scala.collection.immutable.{ HashMap }
+import kr.ac.kaist.safe.util.{Address, SystemAddr}
+import kr.ac.kaist.safe.xwidl.spec.Expr
 
 ////////////////////////////////////////////////////////////////////////////////
 // concrete state type
@@ -30,6 +30,7 @@ trait State // TODO
 trait AbsState extends AbsDomain[State, AbsState] {
   val heap: AbsHeap
   val context: AbsContext
+  val constraint: Expr
 
   def raiseException(excSet: Set[Exception]): AbsState
   def oldify(addr: Address): AbsState

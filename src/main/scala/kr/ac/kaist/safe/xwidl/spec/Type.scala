@@ -2,7 +2,7 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils._
-import kr.ac.kaist.safe.xwidl.solver.{ Pack, PackZ3 }
+import kr.ac.kaist.safe.xwidl.solver.PackZ3
 import kr.ac.kaist.safe.xwidl.pprint._
 
 sealed trait Type extends Pack with PackZ3 {

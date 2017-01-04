@@ -2,8 +2,6 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.PValue
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.solver.Pack
-import kr.ac.kaist.safe.xwidl.pprint._
 
 import scala.collection.immutable.HashMap
 
@@ -18,11 +16,7 @@ case class Interface(
        See ObjBuilder. */
 
     operations: HashMap[String, Operation] = HashMap()
-) extends Pack {
-  def pack: Doc = {
-    text("class") <+> text(name) <+>
-      braces(stack(operations.values.map(_.pack).toList))
-  }
+) {
 
   def getAttrType(attr: String): Option[Type] =
     this.attrs.get(attr) match {

@@ -2,18 +2,18 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.Helper
 import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
-import kr.ac.kaist.safe.analyzer.domain.{ AbsBool, AbsNumber, AbsState, AbsValue, DefaultBool, Num }
+import kr.ac.kaist.safe.analyzer.domain.{AbsBool, AbsNumber, AbsState, AbsValue, DefaultBool, Loc, Num}
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.EJSOp
-import kr.ac.kaist.safe.xwidl.solver.{ Pack, PackZ3 }
+import kr.ac.kaist.safe.xwidl.solver.PackZ3
 import kr.ac.kaist.safe.xwidl.pprint._
 
-sealed trait Expr extends Pack with PackZ3 {
+sealed trait Expr extends PackZ3 {
   def freeVars: Set[String]
 
   def subst(name: String, v: Expr): Expr
 
-  def eval(st: AbsState): Option[AbsValue]
+  def eval(st: AbsState): Option[Expr] // partial evaluation (full eval is the special case when it is AbsExpr(abs))
   /*
    * We need to process qualifiers etc. Maybe implication and more exotic thing in the future
    */
@@ -22,7 +22,7 @@ sealed trait Expr extends Pack with PackZ3 {
     case PredicateVal(x, ty, constraint, _) => {
       ExistsExpr(x, ty, BiOpExpr(this.subst(y, VarExpr(x)), And, constraint)) // TODO: alpha conversion
     }
-    case PreciseVal(v) => this.subst(y, LitExpr(LitAbs(v)))
+    case PreciseVal(v) => this.subst(y, AbsValExpr(v))
   }
 
   def substConcVals(s: List[(ConcVal, String)]): Expr = {
@@ -36,9 +36,6 @@ case class IfThenElseExpr(
     elseBranch: Expr
 ) extends Expr {
 
-  def pack: Doc =
-    text("if") <+> cond.pack <+> text("then") <+> thenBranch.pack <+> text("else") <+> elseBranch.pack
-
   def freeVars: Set[String] =
     cond.freeVars union thenBranch.freeVars union elseBranch.freeVars
 
@@ -48,23 +45,32 @@ case class IfThenElseExpr(
   def packZ3: Doc =
     parens(text("if") <+> cond.packZ3 <+> thenBranch.packZ3 <+> elseBranch.packZ3)
 
-  def eval(st: AbsState): Option[AbsValue] = {
+  def eval(st: AbsState): Option[Expr] = {
     lazy val thenBranchVal = thenBranch.eval(st)
     lazy val elseBranchVal = elseBranch.eval(st)
     cond.eval(st) match {
-      case Some(condVal) => condVal.pvalue.boolval match {
+      case Some(AbsValExpr(condVal)) => condVal.pvalue.boolval match {
         case DefaultBool.True => thenBranchVal
         case DefaultBool.False => elseBranchVal
-        case DefaultBool.Top => for { a <- thenBranchVal; b <- elseBranchVal } yield a + b
+        case DefaultBool.Top =>
+          for { a <- thenBranchVal; b <- elseBranchVal } yield
+            (a, b) match {
+              case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
+              case (e1, e2) => IfThenElseExpr(AbsValExpr(condVal), e1, e2)
+            }
         case DefaultBool.Bot => None
       }
+      case Some(e) => for { a <- thenBranchVal; b <- elseBranchVal } yield
+        (a, b) match {
+          case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
+          case (e1, e2) => IfThenElseExpr(e, e1, e2)
+        }
       case None => None
     }
   }
 }
 
 case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
-  def pack: Doc = le.pack <+> op.pack <+> re.pack
 
   override def freeVars: Set[String] = le.freeVars union re.freeVars
 
@@ -74,22 +80,21 @@ case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
   def packZ3: Doc =
     parens(op.packZ3 <+> le.packZ3 <+> re.packZ3)
 
-  def eval(st: AbsState): Option[AbsValue] = {
-    for { leVal <- le.eval(st); reVal <- re.eval(st) } yield {
-      op match {
-        case EqOp => Helper.bopPlus(leVal, reVal)
-        case GreaterThan => Helper.bopGreater(leVal, reVal)
-        case GreaterEq => Helper.bopGreaterEq(leVal, reVal)
-        case LessEq => Helper.bopLess(leVal, reVal)
-        case And => Helper.bopAnd(leVal, reVal)
-        case Minus => Helper.bopMinus(leVal, reVal)
-        case Plus => Helper.bopPlus(leVal, reVal)
-      }
+  private def biOpEvalHelper(le: Expr, re: Expr,
+                             fe: (Expr, Expr) => Expr,
+                             fv: (AbsValue, AbsValue) => AbsValue): Expr = {
+    (le, re) match {
+      case (AbsValExpr(la), AbsValExpr(ra)) => AbsValExpr(fv(la, ra))
+      case _ => fe(le, re)
     }
+  }
+
+  def eval(st: AbsState): Option[Expr] = {
+    for { leVal <- le.eval(st); reVal <- re.eval(st) } yield
+      biOpEvalHelper(leVal, reVal, op.toBiExpr, op.toBopHelper)
   }
 }
 case class VarExpr(name: String) extends Expr {
-  def pack: Doc = text(name)
 
   override def freeVars: Set[String] = Set(name)
 
@@ -105,8 +110,17 @@ case class VarExpr(name: String) extends Expr {
   def eval(st: AbsState): Option[AbsValue] = None // this should be instantiated already
 }
 
+// This is used in the state's constraint
+// Unified the access variable?
+// FIXME: use default values might look better??
+case class LocAttr(loc: Loc, attr: String) extends Expr {
+  def freeVars: Set[String] = Set()
+  def subst(x: String, v: Expr): Expr = this
+  def eval(st: AbsState): Option[AbsValue] = None
+  def packZ3: Doc = throw new Exception("No implementation")
+}
+
 case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
-  def pack: Doc = text("forall " + x + " :: ") <> parens(e.pack)
   def freeVars: Set[String] = e.freeVars - x
   def subst(y: String, v: Expr): Expr =
     if (x == y) {
@@ -117,13 +131,12 @@ case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
 
   def packZ3: Doc = parens(text("forall") <+> parens(parens(text(x) <+> ty.packZ3)) <+> e.packZ3)
 
-  def eval(st: AbsState): Option[AbsValue] = {
-    e.subst(x, LitExpr(LitAbs(ty.absTopVal))).eval(st)
+  def eval(st: AbsState): Option[Expr] = {
+    e.subst(x, AbsValExpr(ty.absTopVal)).eval(st)
   }
 }
 
 case class ExistsExpr(x: String, ty: Type, e: Expr) extends Expr {
-  def pack: Doc = text("exists " + x + " :: ") <> parens(e.pack)
   def freeVars: Set[String] = e.freeVars - x
   def subst(y: String, v: Expr): Expr =
     if (x == y) {
@@ -133,15 +146,11 @@ case class ExistsExpr(x: String, ty: Type, e: Expr) extends Expr {
     }
   def packZ3: Doc = parens(text("exists") <+> parens(parens(text(x) <+> ty.packZ3)) <+> e.packZ3)
 
-  def eval(st: AbsState): Option[AbsValue] = {
-    ty.concValList.map(concVal => {
-      e.substConcVal(concVal, x).eval(st)
-    }).find(_.isDefined).flatten
-  }
+  def eval(st: AbsState): Option[Expr] = e.eval(st).map(ExistsExpr(x, ty, _))
+  // partially evaluate the body
 }
 
 case class LitExpr(lit: Literal) extends Expr {
-  def pack: Doc = lit.pack
 
   override def freeVars: Set[String] = Set()
 
@@ -149,13 +158,34 @@ case class LitExpr(lit: Literal) extends Expr {
 
   def packZ3: Doc = lit.packZ3
 
-  def eval(st: AbsState): Option[AbsValue] = Some(lit.alpha)
+  def eval(st: AbsState): Option[Expr] = Some(AbsValExpr(lit.alpha))
 }
 
-sealed trait BiOp extends Pack {
-  def pack: Doc = text(this.toString)
+case class AbsValExpr(abs: AbsValue) extends Expr {
+  def freeVars: Set[String] = Set() // really?
+  def subst(x: String, v: Expr): Expr = this
+  def packZ3: Doc = text(abs.toString)
+  def eval(st: AbsState): Option[Expr] = {
+    abs.symbol match {
+      case Some(s) => Some(VarExpr(s))
+      case None => Some(this)
+    }
+  }
+}
+
+sealed trait BiOp {
   def packZ3: Doc = text(this.toString)
   def toEJSop: EJSOp = EJSOp(this.toString)
+  def toBiExpr(e1: Expr, e2: Expr): Expr = BiOpExpr(e1, this, e2)
+  def toBopHelper: (AbsValue, AbsValue) => AbsValue = this match {
+    case EqOp => Helper.bopPlus
+    case GreaterThan => Helper.bopGreater
+    case GreaterEq => Helper.bopGreaterEq
+    case LessEq => Helper.bopLess
+    case And => Helper.bopAnd
+    case Minus => Helper.bopMinus
+    case Plus => Helper.bopPlus
+  }
 }
 
 case object EqOp extends BiOp {
@@ -183,24 +213,19 @@ case object Plus extends BiOp {
   override def toString: String = "+"
 }
 
-sealed trait Literal extends Pack {
-  def packZ3: Doc = pack
+sealed trait Literal extends PackZ3 {
   def alpha: AbsValue
 }
 
 case class LitInt(i: Int) extends Literal {
-  def pack: Doc = text(i.toString)
+  def packZ3: Doc = text(i.toString)
   def alpha: AbsValue = UIntConst(i)
 }
 case class LitNum(i: Double) extends Literal {
-  def pack: Doc = text(i.toString)
+  def packZ3: Doc = text(i.toString)
   def alpha: AbsValue = AbsNumber(i)
 }
 case class LitBool(b: Boolean) extends Literal {
-  def pack: Doc = text(b.toString)
+  def packZ3: Doc = text(b.toString)
   def alpha: AbsValue = AbsBool(b)
-}
-case class LitAbs(a: AbsValue) extends Literal {
-  def pack: Doc = text(a.toString)
-  def alpha: AbsValue = a
 }

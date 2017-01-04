@@ -1,12 +1,9 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-import kr.ac.kaist.safe.analyzer.Semantics
-import kr.ac.kaist.safe.analyzer.domain.DefaultBool.True
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultBool, DefaultNull }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.solver.{ Pack, Solver, Verified }
-import kr.ac.kaist.safe.xwidl.pprint._
+import kr.ac.kaist.safe.xwidl.solver.{ Solver, Verified }
 
 case class OperationException(s: String) extends Exception(s)
 
@@ -18,17 +15,7 @@ case class Operation(
     requires: Expr = LitExpr(LitBool(true)),
     ensures: Expr = LitExpr(LitBool(true)),
     absSemOpt: Option[(AbsState, List[AbsValue]) => AbsValue] = None
-) extends Pack {
-  def pack: Doc = {
-    text("method") <+> text(name) <>
-      parens(splitBy(args.map(_.pack), text(", "))) <>
-      (retTy match {
-        case TyVoid => nil
-        case _ => text(" returns") <+> parens(text("ret:") <+> retTy.pack)
-      }) </>
-      text("requires") <+> requires.pack </>
-      text("ensures") <+> ensures.pack
-  }
+) {
 
   // TODO: meet cases?
   private def genSelMode(concValLists: List[(List[ConcVal], String)]): List[List[(ConcVal, String)]] = {
@@ -39,9 +26,35 @@ case class Operation(
     })
   }
 
+  // Needs soundness proof
+  private def unify(e: Expr, s: Map[String, AbsValue]): (Expr, Map[String, AbsValue]) = {
+    e match {
+      case IfThenElseExpr(cond, thenBranch, elseBranch) => {
+        val (cond2, s2) = unify(cond, s)
+        val (then2, s3) = unify(thenBranch, s2)
+        val (else2, s4) = unify(elseBranch, s3)
+        (IfThenElseExpr(cond2, then2, else2), s4)
+      }
+      case BiOpExpr(VarExpr(v), EqOp, AbsValExpr(absVal)) => (LitExpr(LitBool(true)), s + (v -> absVal))
+      case BiOpExpr(AbsValExpr(absVal), EqOp, VarExpr(v)) => (LitExpr(LitBool(true)), s + (v -> absVal))
+      case BiOpExpr(le, op, re) => {
+        val (le2, s2) = unify(le, s)
+        val (re2, s3) = unify(re, s2)
+        (BiOpExpr(le2, op, re2), s3)
+      }
+      case ExistsExpr(x, ty, e) => {
+        val (e2, s2) = unify(e, s)
+        s.get(x) match {
+          case Some(absVal) => (e2.subst(x, AbsValExpr(absVal)), s - x) /* old binding? */
+          case None => (ExistsExpr(x, ty, e2), s2)
+        }
+      }
+      case _ => (e, s)
+    }
+  }
+
   def call(dafny: Solver, st: AbsState, selfObj: AbsObject,
-    selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
-    // TODO 1. check the prerequisite
+    selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject) = {
 
     val boundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
       case s if s.startsWith("this.") => {
@@ -52,37 +65,60 @@ case class Operation(
     }).toList
 
     if (!boundAbsVals.forall(_.isDefined)) {
+      println("Undefined free vars")
       return (DefaultNull.Top, selfObj)
     }
 
-    val requiresClosed = boundAbsVals.flatten.foldLeft(requires)({
-      case (e, (absVal, y)) => e.subst(y, LitExpr(LitAbs(absVal)))
+    val boundAbsVals2: List[(AbsValue, String)] = boundAbsVals.flatten ++ (argVals zip args.map(_.name))
+
+    val requiresClosed = boundAbsVals2.foldLeft(requires)({
+      case (e, (absVal, y)) => e.subst(y, AbsValExpr(absVal))
     })
 
-    requiresClosed.eval(st) match {
-      case Some(v) if DefaultBool.True <= v.pvalue.boolval => {
-        val concValLists: List[Option[(List[ConcVal], String)]] = ensures.freeVars.map({
-          case "ret" => Some(retTy.concValList, "ret")
+    // it might not be closed -- since some AbsValue are actually symbol
+    // in that case, we will need to conjunct this with the constraint
+    // and use SMT to solve that awkward condition
+
+    val reqSatisfied = requiresClosed.eval(st) match {
+      case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
+      case Some(e) => dafny.assert(BiOpExpr(e, And, st.constraint)) match { // symbolic judgement
+        case Verified => true
+        case _ => false
+      }
+      case None => false
+    }
+
+    if (reqSatisfied) {
+        // Instead of generating the stream for everything, we should
+        // conduct a structural analysis of the post-cond expression,
+        // try to apply full abstraction, equitional unification, and
+        // finally concreatization (and update the trace if everything is fine)
+        // This is becoming more and more like a symbolic executor
+
+        val oldBoundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
           case s if s.startsWith("old_this.") => {
             val attr = s.stripPrefix("old_this.")
-            Some(List(PreciseVal(selfObj.Get(attr, st.heap))), s)
+            Some(selfObj.Get(attr, st.heap), s)
           }
-          case s if s.startsWith("this.") => {
-            val attr = s.stripPrefix("this.")
-            selfIface.getAttrType(attr) match {
-              case Some(ty) => Some(ty.concValList, s)
-              case None => None
-            }
-          }
-          // TODO: args
           case _ => None
         }).toList
 
-        if (!concValLists.forall(_.isDefined)) {
+
+        if (!oldBoundAbsVals.forall(_.isDefined)) {
+          println("Undefined free vars")
           return (DefaultNull.Top, selfObj)
         }
 
-        val selModeStream = genSelMode(concValLists.flatten)
+        val oldBoundAbsVals2 = oldBoundAbsVals.flatten ++ (argVals zip args.map(_.name))
+
+        val ensuredOldClosed = oldBoundAbsVals2.foldLeft(requires)({
+          case (e, (absVal, y)) => e.subst(y, AbsValExpr(absVal))
+        })
+
+        val ensuredUnified: (Expr, Map[String, Expr]) = unify(ensuredOldClosed.eval(st), Map())
+
+
+      val selModeStream = genSelMode(concValLists.flatten)
         for (s <- selModeStream) {
           dafny.assert(ensures.substConcVals(s)) match {
             case Verified => {
@@ -104,20 +140,16 @@ case class Operation(
         }
 
         (DefaultNull.Top, selfObj)
-      }
-      case _ => {
+      } else {
         println("Something is wrong with spec")
         (DefaultNull.Top, selfObj)
       }
-    }
   }
 }
 
 case class Argument(
     name: String,
     ty: Type
-) extends Pack {
-  def pack: Doc = text(name) <> text(":") <+> ty.pack
-}
+)
 
 // FIXME: variadic functions
