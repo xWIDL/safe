@@ -1,7 +1,8 @@
 package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.AbsValue
-import kr.ac.kaist.safe.xwidl.solver.{ Pack, PackZ3 }
+import kr.ac.kaist.safe.nodes.cfg.CFGExpr
+import kr.ac.kaist.safe.xwidl.solver.{Pack, PackZ3}
 import kr.ac.kaist.safe.xwidl.pprint._
 
 sealed trait Expr extends Pack with PackZ3 {
@@ -9,6 +10,10 @@ sealed trait Expr extends Pack with PackZ3 {
 
   def subst(name: String, v: Expr): Expr
 
+  def rewrite: CFGExpr
+  /*
+   * We need to process qualifiers etc. Maybe implication and more exotic thing in the future
+   */
 }
 
 case class IfThenElseExpr(

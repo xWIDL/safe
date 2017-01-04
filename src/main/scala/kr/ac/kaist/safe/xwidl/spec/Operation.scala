@@ -1,9 +1,10 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultNull }
+import kr.ac.kaist.safe.analyzer.Semantics
+import kr.ac.kaist.safe.analyzer.domain.{AbsObject, AbsState, AbsValue, DefaultNull}
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.solver.{ Solver, Pack, Verified }
+import kr.ac.kaist.safe.xwidl.solver.{Pack, Solver, Verified}
 import kr.ac.kaist.safe.xwidl.pprint._
 
 case class OperationException(s: String) extends Exception(s)
@@ -37,9 +38,23 @@ case class Operation(
     })
   }
 
-  def call(dafny: Solver, st: AbsState, selfObj: AbsObject,
-    selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
+  def call(semantics: Semantics, dafny: Solver, st: AbsState, selfObj: AbsObject,
+           selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
     // TODO 1. check the prerequisite
+
+    val boundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
+      case s if s.startsWith("this.") => {
+        val attr = s.stripPrefix("this.")
+        Some(selfObj.Get(attr, st.heap), s)
+      }
+      case _ => None
+    }).toList
+
+    val requiresClosed = boundAbsVals.foldLeft(requires)({
+      case (e, (absVal, y)) => e.subst(y, absVal)
+    })
+
+    val (result, excSet) = semantics.V(requiresClosed.rewrite, st)
 
     val concValLists: List[Option[(List[ConcVal], String)]] = ensures.freeVars.map({
       case "ret" => Some(retTy.concValList, "ret")
