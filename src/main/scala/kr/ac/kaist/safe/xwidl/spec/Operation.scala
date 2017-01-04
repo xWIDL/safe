@@ -1,10 +1,11 @@
 package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.Semantics
-import kr.ac.kaist.safe.analyzer.domain.{AbsObject, AbsState, AbsValue, DefaultNull}
+import kr.ac.kaist.safe.analyzer.domain.DefaultBool.True
+import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultBool, DefaultNull }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.Address
-import kr.ac.kaist.safe.xwidl.solver.{Pack, Solver, Verified}
+import kr.ac.kaist.safe.xwidl.solver.{ Pack, Solver, Verified }
 import kr.ac.kaist.safe.xwidl.pprint._
 
 case class OperationException(s: String) extends Exception(s)
@@ -38,8 +39,8 @@ case class Operation(
     })
   }
 
-  def call(semantics: Semantics, dafny: Solver, st: AbsState, selfObj: AbsObject,
-           selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
+  def call(dafny: Solver, st: AbsState, selfObj: AbsObject,
+    selfIface: Interface, args: List[AbsValue]): (AbsValue, AbsObject) = {
     // TODO 1. check the prerequisite
 
     val boundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
@@ -50,66 +51,65 @@ case class Operation(
       case _ => None
     }).toList
 
-    val requiresClosed = boundAbsVals.foldLeft(requires)({
-      case (e, (absVal, y)) => e.subst(y, absVal)
-    })
-
-    val (result, excSet) = semantics.V(requiresClosed.rewrite, st)
-
-    val concValLists: List[Option[(List[ConcVal], String)]] = ensures.freeVars.map({
-      case "ret" => Some(retTy.concValList, "ret")
-      case s if s.startsWith("old_this.") => {
-        val attr = s.stripPrefix("old_this.")
-        Some(List(PreciseVal(selfObj.Get(attr, st.heap))), s)
-      }
-      case s if s.startsWith("this.") => {
-        val attr = s.stripPrefix("this.")
-        selfIface.getAttrType(attr) match {
-          case Some(ty) => Some(ty.concValList, s)
-          case None => None
-        }
-      }
-      // TODO: args
-      case _ => None
-    }).toList
-
-    if (!concValLists.forall(_.isDefined)) {
+    if (!boundAbsVals.forall(_.isDefined)) {
       return (DefaultNull.Top, selfObj)
     }
 
-    val selModeStream = genSelMode(concValLists.flatten)
-    for (s <- selModeStream) {
-      val ensuresClosed = s.foldLeft(ensures)({
-        case (e, (concVal, y)) => {
-          concVal match {
-            case PredicateVal(x, ty, constraint, _) => {
-              ExistsExpr(x, ty, BiOpExpr(e.subst(y, VarExpr(x)), And, constraint)) // TODO: alpha conversion
-            }
-            case PreciseVal(v) => e.subst(y, LitExpr(LitAbs(v)))
-          }
-        }
-      })
+    val requiresClosed = boundAbsVals.flatten.foldLeft(requires)({
+      case (e, (absVal, y)) => e.subst(y, LitExpr(LitAbs(absVal)))
+    })
 
-      dafny.assert(ensuresClosed) match {
-        case Verified => {
-          val updatedProps = s.filter({ case (_, name) => name.startsWith("this.") })
-          val selfObj2 = updatedProps.foldLeft(selfObj)({
-            case (selfObj, (propVal, propName)) => {
-              val prop = propName.stripPrefix("this.")
-              val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal.alpha, true, st.heap) // TODO: exception
-              selfObj2
+    requiresClosed.eval(st) match {
+      case Some(v) if DefaultBool.True <= v.pvalue.boolval => {
+        val concValLists: List[Option[(List[ConcVal], String)]] = ensures.freeVars.map({
+          case "ret" => Some(retTy.concValList, "ret")
+          case s if s.startsWith("old_this.") => {
+            val attr = s.stripPrefix("old_this.")
+            Some(List(PreciseVal(selfObj.Get(attr, st.heap))), s)
+          }
+          case s if s.startsWith("this.") => {
+            val attr = s.stripPrefix("this.")
+            selfIface.getAttrType(attr) match {
+              case Some(ty) => Some(ty.concValList, s)
+              case None => None
             }
-          })
-          s.find({ case (_, name) => name == "ret" }) match {
-            case Some((retVal, _)) => return (retVal.alpha, selfObj2)
-            case None => return (retTy.absTopVal, selfObj2)
+          }
+          // TODO: args
+          case _ => None
+        }).toList
+
+        if (!concValLists.forall(_.isDefined)) {
+          return (DefaultNull.Top, selfObj)
+        }
+
+        val selModeStream = genSelMode(concValLists.flatten)
+        for (s <- selModeStream) {
+          dafny.assert(ensures.substConcVals(s)) match {
+            case Verified => {
+              val updatedProps = s.filter({ case (_, name) => name.startsWith("this.") })
+              val selfObj2 = updatedProps.foldLeft(selfObj)({
+                case (selfObj, (propVal, propName)) => {
+                  val prop = propName.stripPrefix("this.")
+                  val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal.alpha, true, st.heap) // TODO: exception
+                  selfObj2
+                }
+              })
+              s.find({ case (_, name) => name == "ret" }) match {
+                case Some((retVal, _)) => return (retVal.alpha, selfObj2)
+                case None => return (retTy.absTopVal, selfObj2)
+              }
+            }
+            case _ => ()
           }
         }
-        case _ => ()
+
+        (DefaultNull.Top, selfObj)
+      }
+      case _ => {
+        println("Something is wrong with spec")
+        (DefaultNull.Top, selfObj)
       }
     }
-
-    (DefaultNull.Top, selfObj)
   }
 }
 

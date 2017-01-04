@@ -289,6 +289,11 @@ object Helper {
     AbsValue(resAbsNum)
   }
 
+  def bopAnd(left: AbsValue, right: AbsValue): AbsValue = {
+    val resAbsBool = typeHelper.ToBoolean(left) && typeHelper.ToBoolean(right)
+    AbsValue(resAbsBool)
+  }
+
   /* / */
   def bopDiv(left: AbsValue, right: AbsValue): AbsValue = {
     val resAbsNum = typeHelper.ToNumber(left) div typeHelper.ToNumber(right)
