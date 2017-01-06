@@ -64,7 +64,7 @@ case class Operation(
   }
 
   private def eqResolve(eq: List[(String, String)], s: Map[String, AbsValue]): (List[(String, String)], Map[String, AbsValue]) = {
-    s.foldLeft(eq, Map[String, AbsValue]())({
+    s.foldLeft(eq, s)({
       case ((eq, s), (x, v)) => {
         if (eq.isEmpty) {
           (eq, s)
@@ -107,7 +107,7 @@ case class Operation(
       case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
     })
 
-    // it might not be closed -- since some AbsValue are actually symbol
+    // it might not be closed -- since some AbsValue are actually symbols
     // in that case, we will need to conjunct this with the constraint
     // and use SMT to solve that awkward condition
 
@@ -144,7 +144,7 @@ case class Operation(
             }
           }
         }
-        case s if s.startsWith("this.") => List()
+        case s if s.startsWith("this.") || argValsMap.isDefinedAt(s) => List()
         case _ => {
           println("Something is wrong")
           List()

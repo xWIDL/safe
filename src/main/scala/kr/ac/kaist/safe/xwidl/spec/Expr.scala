@@ -169,6 +169,7 @@ sealed trait BiOp {
     case And => Helper.bopAnd
     case Minus => Helper.bopMinus
     case Plus => Helper.bopPlus
+    case Or => Helper.bopOr
   }
 }
 

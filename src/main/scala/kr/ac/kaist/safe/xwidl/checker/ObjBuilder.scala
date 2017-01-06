@@ -14,6 +14,11 @@ import scala.collection.immutable.HashSet
 object ObjBuilder {
   var solver = new Solver(List(BuiltinMath))
 
+  private def loadArg(s: String, args: AbsValue, h: AbsHeap): AbsValue =
+    Helper.propLoad(args, Set(AbsString(Str(s))), h)
+  private def loadArg(i: Int, args: AbsValue, h: AbsHeap): AbsValue =
+    Helper.propLoad(args, Set(AbsString(Str(i.toString))), h)
+
   def buildPrototype(interface: Interface): ObjModel = {
     val opHashSet = interface.operations.values.map(_.objAddr).toSet
     ObjModel(
@@ -36,7 +41,7 @@ object ObjBuilder {
                 case ((h, value, excSet), loc) => {
                   val thisObj = h.get(loc)
 
-                  val length = Helper.propLoad(args, Set(AbsString("length")), h).pvalue.numval
+                  val length = loadArg("length", args, h).pvalue.numval
 
                   val actualLen: AbsNumber = AbsNumber(op.args.length)
                   if (!(actualLen <= length)) {
@@ -44,11 +49,10 @@ object ObjBuilder {
                     (h, DefaultNull.Top, excSet)
                   } else {
                     val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
-                      case (arg, i) => (i, Helper.propLoad(args, Set(AbsString(i.toString)), h) <= arg.ty.absTopVal)
+                      case (arg, i) => (i, loadArg(i, args, h) <= arg.ty.absTopVal)
                     }).toList
 
-                    val absArgs: List[AbsValue] = List.range(0, op.args.length)
-                      .map(i => Helper.propLoad(args, Set(AbsString(i.toString)), h))
+                    val absArgs: List[AbsValue] = List.range(0, op.args.length).map(loadArg(_, args, h))
 
                     if (argsMatch.forall({ case (_, matched) => matched })) {
 
