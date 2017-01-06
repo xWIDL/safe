@@ -64,7 +64,7 @@ case class Operation(
   }
 
   private def eqResolve(eq: List[(String, String)], s: Map[String, AbsValue]): (List[(String, String)], Map[String, AbsValue]) = {
-    s.foldLeft(eq, Map[String, AbsValue]())({
+    s.foldLeft(eq, s)({
       case ((eq, s), (x, v)) => {
         if (eq.isEmpty) {
           (eq, s)
@@ -85,12 +85,11 @@ case class Operation(
         val attr = s.stripPrefix("this.")
         Some(s, selfObj.Get(attr, st.heap))
       }
-      case s if s.contains(".") => {
-        val xs = s.split(".") // FIXME: multi-level access
-        val x = xs.head
-        val attr = xs.tail.head
+      case s if s.contains(".") && !s.startsWith("this.") => {
+        val (x, attr) = s.splitAt(s.indexOf(".")) // FIXME: multi-level access
+        val attr2 = attr.tail
         argValsMap.get(x) match {
-          case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
+          case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr2, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
           case None => None
         }
       }
@@ -128,35 +127,41 @@ case class Operation(
       // finally concreatization (and update the trace if everything is fine)
       // This is becoming more and more like a symbolic executor
 
-      val oldBoundAbsVals: List[Option[(String, AbsValue)]] = requires.freeVars.map({
-        case s if s.startsWith("this.") => {
-          val attr = s.stripPrefix("this.")
-          Some(s, selfObj.Get(attr, st.heap))
+      val oldBoundAbsVals: List[(String, AbsValue)] = ensures.freeVars.flatMap({
+        case s if s.startsWith("old_this.") => {
+          val attr = s.stripPrefix("old_this.")
+          List((s, selfObj.Get(attr, st.heap)))
         }
-        case s if s.contains(".") => {
-          val xs = s.split(".") // FIXME: multi-level access
-          val x = xs.head
-          val attr = xs.tail.head
+        case s if s.contains(".") && !s.startsWith("this.") => {
+          val (x, attr) = s.splitAt(s.indexOf(".")) // FIXME: multi-level access
+          val attr2 = attr.tail
           argValsMap.get(x) match {
-            case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
-            case None => None
+            case Some(xVal) =>
+              List((s, xVal.locset.map(st.heap.get(_).Get(attr2, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2)))
+            case None => {
+              println("Something is wrong")
+              List()
+            }
           }
         }
-        case _ => None
+        case s if s.startsWith("this.") => List()
+        case _ => {
+          println("Something is wrong")
+          List()
+        }
       }).toList
 
-      if (!oldBoundAbsVals.forall(_.isDefined)) {
-        println("Undefined free vars")
-        return (DefaultNull.Top, selfObj)
-      }
+      val oldBoundAbsVals2 = argValsMap ++ oldBoundAbsVals
 
-      val oldBoundAbsVals2 = argValsMap ++ oldBoundAbsVals.flatten
-
-      val ensuredOldClosed = oldBoundAbsVals2.foldLeft(requires)({
+      val ensuredOldClosed = oldBoundAbsVals2.foldLeft(ensures)({
         case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
       })
 
       ensuredOldClosed.eval(st) match { // Partial evaluation
+        case None => {
+          println("Something goes wrong")
+          (DefaultValue.Top, selfObj)
+        }
         case Some(e) => {
 
           val (e2, s, eq) = unify(e, Map(), List())

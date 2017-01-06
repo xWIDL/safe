@@ -101,7 +101,7 @@ case class VarExpr(name: String) extends Expr {
 
   def packZ3: Doc = text(name)
 
-  def eval(st: AbsState): Option[Expr] = None // this should be instantiated already
+  def eval(st: AbsState): Option[Expr] = Some(this)
 }
 
 case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
