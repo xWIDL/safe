@@ -177,7 +177,7 @@ case class Operation(
             // DO I NEED TO CHECK AGAIN?
 
             // substitute
-            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
+            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type? is Top good?
 
             // TODO: the heap effect
 
