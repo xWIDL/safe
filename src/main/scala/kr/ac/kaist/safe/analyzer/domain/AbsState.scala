@@ -54,6 +54,7 @@ trait AbsState extends AbsDomain[State, AbsState] {
 }
 
 trait AbsStateUtil extends AbsDomainUtil[State, AbsState] {
+  def apply(heap: AbsHeap, context: AbsContext, constraint: Expr): AbsState
   def apply(heap: AbsHeap, context: AbsContext): AbsState
 }
 
@@ -85,10 +86,10 @@ object DefaultState extends AbsStateUtil {
       this.heap <= that.heap && this.context <= that.context
 
     def +(that: AbsState): AbsState =
-      Dom(this.heap + that.heap, this.context + that.context, this.constraint <||> that.constraint)
+      Dom(this.heap + that.heap, this.context + that.context, (this.constraint <||> that.constraint).eval(this).get)
 
     def <>(that: AbsState): AbsState =
-      Dom(this.heap <> that.heap, this.context <> that.context, this.constraint <&&> that.constraint)
+      Dom(this.heap <> that.heap, this.context <> that.context, (this.constraint <&&> that.constraint).eval(this).get)
 
     def raiseException(excSet: Set[Exception]): AbsState = {
       if (excSet.isEmpty) Bot
@@ -247,7 +248,10 @@ object DefaultState extends AbsStateUtil {
         context.toString + LINE_SEP +
         LINE_SEP +
         "** old address set **" + LINE_SEP +
-        context.old.toString
+        context.old.toString +
+        LINE_SEP +
+        "** constraint **" + LINE_SEP +
+        constraint
     }
   }
 }

@@ -76,7 +76,7 @@ case class Operation(
     })
   }
 
-  def call(dafny: Solver, st: AbsState, selfObj: AbsObject, selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject) = {
+  def call(dafny: Solver, st: AbsState, selfObj: AbsObject, selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject, Expr) = {
 
     val argValsMap: Map[String, AbsValue] = args.map(_.name).zip(argVals).toMap
 
@@ -88,7 +88,8 @@ case class Operation(
         List((s, selfObj.Get(attr, st.heap)))
       }
       case s if s.contains(".") && !s.startsWith("this.") => {
-        val (x, attr) = s.splitAt(s.indexOf(".")) // FIXME: multi-level access
+        val (x, attr) = s.splitAt(s.indexOf("."))
+        // FIXME: multi-level access
         val attr2 = attr.tail
         argValsMap.get(x) match {
           case Some(xVal) => List((s, xVal.locset.map(st.heap.get(_).Get(attr2, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2)))
@@ -101,7 +102,12 @@ case class Operation(
     val boundAbsVals2: List[(String, AbsValue)] = boundAbsVals ++ argValsMap
 
     val requiresClosed = boundAbsVals2.foldLeft(requires)({
-      case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
+      case (e, (y, absVal)) => {
+        absVal.symbol match {
+          case Some(s) => e.subst(y, VarExpr(s))
+          case None => e.subst(y, AbsValExpr(absVal))
+        }
+      }
     })
 
     // it might not be closed -- since some AbsValue are actually symbols
@@ -110,7 +116,8 @@ case class Operation(
 
     val reqSatisfied = requiresClosed.eval(st) match {
       case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
-      case Some(e) => dafny.assert(BiOpExpr(e, And, st.constraint)) match { // symbolic judgement
+      case Some(e) => dafny.assert(BiOpExpr(e, And, st.constraint)) match {
+        // symbolic judgement
         case Verified => true
         case _ => false
       }
@@ -130,7 +137,8 @@ case class Operation(
           List((s, selfObj.Get(attr, st.heap)))
         }
         case s if s.contains(".") && !s.startsWith("this.") => {
-          val (x, attr) = s.splitAt(s.indexOf(".")) // FIXME: multi-level access
+          val (x, attr) = s.splitAt(s.indexOf("."))
+          // FIXME: multi-level access
           val attr2 = attr.tail
           argValsMap.get(x) match {
             case Some(xVal) =>
@@ -154,10 +162,11 @@ case class Operation(
         case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
       })
 
-      ensuredOldClosed.eval(st) match { // Partial evaluation
+      ensuredOldClosed.eval(st) match {
+        // Partial evaluation
         case None => {
           println("Something goes wrong")
-          (DefaultValue.Top, selfObj)
+          (DefaultValue.Top, selfObj, st.constraint)
         }
         case Some(e) => {
 
@@ -190,7 +199,7 @@ case class Operation(
               }
             })
 
-            (retVal, selfObj2)
+            (retVal, selfObj2, st.constraint)
           } else {
             // Use symbolic constraint...
             // DO I NEED TO CHECK AGAIN?
@@ -220,22 +229,20 @@ case class Operation(
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
                   val sym = NodeUtil.freshName(attr)
-                  (o.update(attr, AbsDataProp(AbsValue(sym))), e.subst(x, VarExpr(sym)))
+                  (o.update(attr, AbsDataProp(AbsValue.symbolize(sym))), e.subst(x, VarExpr(sym)))
                 } else {
                   (o, e)
                 }
               }
             })
 
-            // TODO: the constraint effect
-
-            (retVal, selfObj3)
+            (retVal, selfObj3, (e3 <&&> st.constraint).eval(st).get)
           }
         }
       }
     } else {
       println("Pre-condition of " + name + " operation is not satisfied")
-      (DefaultNull.Top, selfObj)
+      (DefaultNull.Top, selfObj, st.constraint)
     }
   }
 }

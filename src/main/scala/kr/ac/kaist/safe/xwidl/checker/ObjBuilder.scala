@@ -37,8 +37,8 @@ object ObjBuilder {
               val thisBinding = st.context.thisBinding
               val (thisLoc, state, es) = TypeConversionHelper.ToObject(thisBinding, st, op.objAddr)
               val h = state.heap
-              val (retH, retV, excSet) = thisLoc.foldLeft((h, AbsValue.Bot, es)) {
-                case ((h, value, excSet), loc) => {
+              val (retH, retV, retCons, excSet) = thisLoc.foldLeft((h, AbsValue.Bot, LitExpr(LitBool(true)): Expr, es)) {
+                case ((h, value, cons, excSet), loc) => {
                   val thisObj = h.get(loc)
 
                   val length = loadArg("length", args, h).pvalue.numval
@@ -46,7 +46,7 @@ object ObjBuilder {
                   val actualLen: AbsNumber = AbsNumber(op.args.length)
                   if (!(actualLen <= length)) {
                     println("[WARNING] unmatched argument number")
-                    (h, DefaultNull.Top, excSet)
+                    (h, DefaultNull.Top, cons, excSet)
                   } else {
                     val argsMatch: List[(Int, Boolean)] = op.args.view.zipWithIndex.map({
                       case (arg, i) => (i, loadArg(i, args, h) <= arg.ty.absTopVal)
@@ -57,16 +57,16 @@ object ObjBuilder {
                     if (argsMatch.forall({ case (_, matched) => matched })) {
 
                       op.absSemOpt match {
-                        case Some(sem) => (h, sem(st, absArgs), excSet)
+                        case Some(sem) => (h, sem(st, absArgs), cons, excSet)
                         case None => {
 
-                          val (retVal, thisObj2) = op.call(solver, st, thisObj, interface, absArgs)
+                          val (retVal, thisObj2, retCons) = op.call(solver, st, thisObj, interface, absArgs)
 
                           (h.update(loc, thisObj2), if (retVal.pvalue != null) {
                             retVal + value
                           } else {
                             value
-                          }, excSet) // TODO: why pvalue will be null?
+                          }, (retCons <||> cons).eval(st).get, excSet) // TODO: why pvalue will be null?
                         }
                       }
                     } else {
@@ -77,7 +77,7 @@ object ObjBuilder {
                             s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
                         }
                       })
-                      (h, DefaultNull.Top, excSet)
+                      (h, DefaultNull.Top, cons, excSet)
                     }
                   }
                 }
@@ -85,7 +85,7 @@ object ObjBuilder {
 
               // Then returned undefined
               val excSt = st.raiseException(excSet)
-              (AbsState(retH, state.context), excSt, retV)
+              (AbsState(retH, state.context, retCons), excSt, retV)
             })
           ), T, F, T)
         }).toList

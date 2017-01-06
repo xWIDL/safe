@@ -26,7 +26,7 @@ abstract class Value
 trait AbsValue extends AbsDomain[Value, AbsValue] {
   val pvalue: AbsPValue
   val locset: AbsLoc
-  val symbol: Option[String] = None
+  val symbol: Option[String]
 
   /* substitute locR by locO */
   def subsLoc(locR: Loc, locO: Loc): AbsValue
@@ -43,6 +43,7 @@ trait AbsValueUtil extends AbsDomainUtil[Value, AbsValue] {
   def apply(pvalue: AbsPValue): AbsValue
   def apply(locset: AbsLoc): AbsValue
   def apply(pvalue: AbsPValue, locset: AbsLoc): AbsValue
+  def symbolize(s: String): AbsValue
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,8 +61,9 @@ object DefaultValue extends AbsValueUtil {
   def apply(pvalue: AbsPValue): AbsValue = Bot.copy(pvalue = pvalue)
   def apply(locset: AbsLoc): AbsValue = Bot.copy(locset = locset)
   def apply(pvalue: AbsPValue, locset: AbsLoc): AbsValue = Dom(pvalue, locset)
+  def symbolize(s: String): AbsValue = Bot.copy(symbol = Some(s))
 
-  case class Dom(pvalue: AbsPValue, locset: AbsLoc) extends AbsValue {
+  case class Dom(pvalue: AbsPValue, locset: AbsLoc, symbol: Option[String] = None) extends AbsValue {
     def gamma: ConSet[Value] = ConInf() // TODO more precisely
 
     def isBottom: Boolean = this == Bot
@@ -100,11 +102,17 @@ object DefaultValue extends AbsValueUtil {
         if (locset.isBottom) ""
         else locset.toString
 
-      (pvalue.isBottom, locset.isBottom) match {
-        case (true, true) => "⊥(value)"
-        case (true, false) => locSetStr
-        case (false, true) => pvalStr
-        case (false, false) => s"$pvalStr, $locSetStr"
+      val symStr = symbol match {
+        case Some(s) => s
+        case None => ""
+      }
+
+      (pvalue.isBottom, locset.isBottom, symbol.isDefined) match {
+        case (true, true, false) => "⊥(value)"
+        case (true, true, true) => s"sym($symStr)"
+        case (true, false, _) => locSetStr
+        case (false, true, _) => pvalStr
+        case (false, false, _) => s"$pvalStr, $locSetStr"
       }
     }
 
