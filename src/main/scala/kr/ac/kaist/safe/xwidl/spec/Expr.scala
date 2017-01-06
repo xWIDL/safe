@@ -2,7 +2,7 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.Helper
 import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
-import kr.ac.kaist.safe.analyzer.domain.{AbsBool, AbsNumber, AbsState, AbsValue, DefaultBool, Loc, Num}
+import kr.ac.kaist.safe.analyzer.domain.{ AbsState, AbsValue, DefaultBool }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.util.EJSOp
 import kr.ac.kaist.safe.xwidl.solver.PackZ3
@@ -28,6 +28,9 @@ sealed trait Expr extends PackZ3 {
   def substConcVals(s: List[(ConcVal, String)]): Expr = {
     s.foldLeft(this)({ case (e, (concVal, y)) => e.substConcVal(concVal, y) })
   }
+
+  def <||>(e2: Expr): Expr = BiOpExpr(this, Or, e2)
+  def <&&>(e2: Expr): Expr = BiOpExpr(this, And, e2)
 }
 
 case class IfThenElseExpr(
@@ -53,18 +56,16 @@ case class IfThenElseExpr(
         case DefaultBool.True => thenBranchVal
         case DefaultBool.False => elseBranchVal
         case DefaultBool.Top =>
-          for { a <- thenBranchVal; b <- elseBranchVal } yield
-            (a, b) match {
-              case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
-              case (e1, e2) => IfThenElseExpr(AbsValExpr(condVal), e1, e2)
-            }
+          for { a <- thenBranchVal; b <- elseBranchVal } yield (a, b) match {
+            case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
+            case (e1, e2) => IfThenElseExpr(AbsValExpr(condVal), e1, e2)
+          }
         case DefaultBool.Bot => None
       }
-      case Some(e) => for { a <- thenBranchVal; b <- elseBranchVal } yield
-        (a, b) match {
-          case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
-          case (e1, e2) => IfThenElseExpr(e, e1, e2)
-        }
+      case Some(e) => for { a <- thenBranchVal; b <- elseBranchVal } yield (a, b) match {
+        case (AbsValExpr(a1), AbsValExpr(a2)) => AbsValExpr(a1 + a2)
+        case (e1, e2) => IfThenElseExpr(e, e1, e2)
+      }
       case None => None
     }
   }
@@ -81,8 +82,8 @@ case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
     parens(op.packZ3 <+> le.packZ3 <+> re.packZ3)
 
   private def biOpEvalHelper(le: Expr, re: Expr,
-                             fe: (Expr, Expr) => Expr,
-                             fv: (AbsValue, AbsValue) => AbsValue): Expr = {
+    fe: (Expr, Expr) => Expr,
+    fv: (AbsValue, AbsValue) => AbsValue): Expr = {
     (le, re) match {
       case (AbsValExpr(la), AbsValExpr(ra)) => AbsValExpr(fv(la, ra))
       case _ => fe(le, re)
@@ -90,34 +91,17 @@ case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
   }
 
   def eval(st: AbsState): Option[Expr] = {
-    for { leVal <- le.eval(st); reVal <- re.eval(st) } yield
-      biOpEvalHelper(leVal, reVal, op.toBiExpr, op.toBopHelper)
+    for { leVal <- le.eval(st); reVal <- re.eval(st) } yield biOpEvalHelper(leVal, reVal, op.toBiExpr, op.toBopHelper)
   }
 }
 case class VarExpr(name: String) extends Expr {
+  def freeVars: Set[String] = Set(name)
 
-  override def freeVars: Set[String] = Set(name)
-
-  def subst(x: String, v: Expr): Expr =
-    if (x == name) {
-      v
-    } else {
-      this
-    }
+  def subst(x: String, v: Expr): Expr = if (x == name) { v } else { this }
 
   def packZ3: Doc = text(name)
 
-  def eval(st: AbsState): Option[AbsValue] = None // this should be instantiated already
-}
-
-// This is used in the state's constraint
-// Unified the access variable?
-// FIXME: use default values might look better??
-case class LocAttr(loc: Loc, attr: String) extends Expr {
-  def freeVars: Set[String] = Set()
-  def subst(x: String, v: Expr): Expr = this
-  def eval(st: AbsState): Option[AbsValue] = None
-  def packZ3: Doc = throw new Exception("No implementation")
+  def eval(st: AbsState): Option[Expr] = None // this should be instantiated already
 }
 
 case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
@@ -203,8 +187,11 @@ case object LessEq extends BiOp {
 }
 case object And extends BiOp {
   override def toString: String = "&&"
-
   override def packZ3: Doc = text("and")
+}
+case object Or extends BiOp {
+  override def toString: String = "||"
+  override def packZ3: Doc = text("or")
 }
 case object Minus extends BiOp {
   override def toString: String = "-"
@@ -212,7 +199,6 @@ case object Minus extends BiOp {
 case object Plus extends BiOp {
   override def toString: String = "+"
 }
-
 sealed trait Literal extends PackZ3 {
   def alpha: AbsValue
 }

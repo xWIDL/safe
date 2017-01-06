@@ -53,8 +53,6 @@ trait AbsObject extends AbsDomain[Object, AbsObject] {
   def contains(astr: AbsString): AbsBool
   def contains(in: InternalName): AbsBool
 
-  def getSymbolAttr(str: String): Option[String]
-
   // def getOwnPropertyNames: Set[String]
   def abstractKeySet: ConSet[AbsString]
   def abstractKeySet(filter: (AbsString, AbsDataProp) => Boolean): ConSet[AbsString]
@@ -142,9 +140,9 @@ object DefaultObject extends AbsObjectUtil {
   case object Top extends Dom
   case class ObjMap(
     amap: AbsMap,
-    imap: ObjInternalMap = ObjEmptyIMap,
-    smap: Map[String, String] = Map() // XXX: AbsMap-like?
+    imap: ObjInternalMap = ObjEmptyIMap
   ) extends Dom
+
   lazy val Bot: AbsObject = ObjMap(AbsMapBot)
   lazy val Empty: AbsObject = ObjMap(AbsMapEmpty)
 
@@ -161,11 +159,6 @@ object DefaultObject extends AbsObjectUtil {
 
   sealed abstract class Dom extends AbsObject {
     def gamma: ConSet[Object] = ConInf() // TODO more precise
-
-    def getSymbolAttr(str: String): Option[String] = this match {
-      case Top => None
-      case ObjMap(_, _, smap) => smap.get(str)
-    }
 
     def getSingle: ConSingle[Object] = ConMany() // TODO more precise
 

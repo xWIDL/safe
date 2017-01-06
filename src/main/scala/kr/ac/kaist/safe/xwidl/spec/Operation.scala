@@ -1,8 +1,8 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultBool, DefaultNull }
+import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
-import kr.ac.kaist.safe.util.Address
+import kr.ac.kaist.safe.util.{ Address, NodeUtil }
 import kr.ac.kaist.safe.xwidl.solver.{ Solver, Verified }
 
 case class OperationException(s: String) extends Exception(s)
@@ -27,39 +27,72 @@ case class Operation(
   }
 
   // Needs soundness proof
-  private def unify(e: Expr, s: Map[String, AbsValue]): (Expr, Map[String, AbsValue]) = {
+  private def unify(e: Expr, s: Map[String, AbsValue], eq: List[(String, String)]): (Expr, Map[String, AbsValue], List[(String, String)]) = {
     e match {
       case IfThenElseExpr(cond, thenBranch, elseBranch) => {
-        val (cond2, s2) = unify(cond, s)
-        val (then2, s3) = unify(thenBranch, s2)
-        val (else2, s4) = unify(elseBranch, s3)
-        (IfThenElseExpr(cond2, then2, else2), s4)
+        val (cond2, s2, eq2) = unify(cond, s, eq)
+        val (then2, s3, eq3) = unify(thenBranch, s2, eq2)
+        val (else2, s4, eq4) = unify(elseBranch, s3, eq3)
+        (IfThenElseExpr(cond2, then2, else2), s4, eq4)
       }
-      case BiOpExpr(VarExpr(v), EqOp, AbsValExpr(absVal)) => (LitExpr(LitBool(true)), s + (v -> absVal))
-      case BiOpExpr(AbsValExpr(absVal), EqOp, VarExpr(v)) => (LitExpr(LitBool(true)), s + (v -> absVal))
+      case BiOpExpr(VarExpr(v), EqOp, AbsValExpr(absVal)) =>
+        (LitExpr(LitBool(true)), s + (v -> absVal), eq)
+      case BiOpExpr(AbsValExpr(absVal), EqOp, VarExpr(v)) =>
+        (LitExpr(LitBool(true)), s + (v -> absVal), eq)
+      case BiOpExpr(VarExpr(v1), EqOp, VarExpr(v2)) =>
+        (LitExpr(LitBool(true)), s, (v1, v2) :: eq)
       case BiOpExpr(le, op, re) => {
-        val (le2, s2) = unify(le, s)
-        val (re2, s3) = unify(re, s2)
-        (BiOpExpr(le2, op, re2), s3)
+        val (le2, s2, eq2) = unify(le, s, eq)
+        val (re2, s3, eq3) = unify(re, s2, eq2)
+        (BiOpExpr(le2, op, re2), s3, eq3)
       }
       case ExistsExpr(x, ty, e) => {
-        val (e2, s2) = unify(e, s)
+        val (e2, s2, eq2) = unify(e, s, eq)
         s.get(x) match {
-          case Some(absVal) => (e2.subst(x, AbsValExpr(absVal)), s - x) /* old binding? */
-          case None => (ExistsExpr(x, ty, e2), s2)
+          case Some(absVal) => (e2.subst(x, AbsValExpr(absVal)), s - x, eq2) /* old binding? */
+          case None => (ExistsExpr(x, ty, e2), s2, eq2)
         }
       }
-      case _ => (e, s)
+      case _ => (e, s, eq)
     }
   }
 
-  def call(dafny: Solver, st: AbsState, selfObj: AbsObject,
-    selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject) = {
+  private def findEq(eq: List[(String, String)], x: String): (List[(String, String)], Set[String]) = {
+    val subXs = eq.filter({ case (u, v) => u == x || v == x }).flatMap({ case (u, v) => Set(u, v) })
+    val (eq2, s) = findEq(eq.filter({ case (u, v) => u != x && v != x }), x)
+    (eq2, s ++ subXs)
+  }
 
-    val boundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
+  private def eqResolve(eq: List[(String, String)], s: Map[String, AbsValue]): (List[(String, String)], Map[String, AbsValue]) = {
+    s.foldLeft(eq, Map[String, AbsValue]())({
+      case ((eq, s), (x, v)) => {
+        if (eq.isEmpty) {
+          (eq, s)
+        } else {
+          val (eq2, eqX) = findEq(eq, x)
+          (eq2, s ++ eqX.map((_, v)))
+        }
+      }
+    })
+  }
+
+  def call(dafny: Solver, st: AbsState, selfObj: AbsObject, selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject) = {
+
+    val argValsMap: Map[String, AbsValue] = args.map(_.name).zip(argVals).toMap
+
+    val boundAbsVals: List[Option[(String, AbsValue)]] = requires.freeVars.map({
       case s if s.startsWith("this.") => {
         val attr = s.stripPrefix("this.")
-        Some(selfObj.Get(attr, st.heap), s)
+        Some(s, selfObj.Get(attr, st.heap))
+      }
+      case s if s.contains(".") => {
+        val xs = s.split(".") // FIXME: multi-level access
+        val x = xs.head
+        val attr = xs.tail.head
+        argValsMap.get(x) match {
+          case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
+          case None => None
+        }
       }
       case _ => None
     }).toList
@@ -69,10 +102,10 @@ case class Operation(
       return (DefaultNull.Top, selfObj)
     }
 
-    val boundAbsVals2: List[(AbsValue, String)] = boundAbsVals.flatten ++ (argVals zip args.map(_.name))
+    val boundAbsVals2: List[(String, AbsValue)] = boundAbsVals.flatten ++ argValsMap
 
     val requiresClosed = boundAbsVals2.foldLeft(requires)({
-      case (e, (absVal, y)) => e.subst(y, AbsValExpr(absVal))
+      case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
     })
 
     // it might not be closed -- since some AbsValue are actually symbol
@@ -89,67 +122,125 @@ case class Operation(
     }
 
     if (reqSatisfied) {
-        // Instead of generating the stream for everything, we should
-        // conduct a structural analysis of the post-cond expression,
-        // try to apply full abstraction, equitional unification, and
-        // finally concreatization (and update the trace if everything is fine)
-        // This is becoming more and more like a symbolic executor
+      // Instead of generating the stream for everything, we should
+      // conduct a structural analysis of the post-cond expression,
+      // try to apply full abstraction, equitional unification, and
+      // finally concreatization (and update the trace if everything is fine)
+      // This is becoming more and more like a symbolic executor
 
-        val oldBoundAbsVals: List[Option[(AbsValue, String)]] = requires.freeVars.map({
-          case s if s.startsWith("old_this.") => {
-            val attr = s.stripPrefix("old_this.")
-            Some(selfObj.Get(attr, st.heap), s)
-          }
-          case _ => None
-        }).toList
-
-
-        if (!oldBoundAbsVals.forall(_.isDefined)) {
-          println("Undefined free vars")
-          return (DefaultNull.Top, selfObj)
+      val oldBoundAbsVals: List[Option[(String, AbsValue)]] = requires.freeVars.map({
+        case s if s.startsWith("this.") => {
+          val attr = s.stripPrefix("this.")
+          Some(s, selfObj.Get(attr, st.heap))
         }
-
-        val oldBoundAbsVals2 = oldBoundAbsVals.flatten ++ (argVals zip args.map(_.name))
-
-        val ensuredOldClosed = oldBoundAbsVals2.foldLeft(requires)({
-          case (e, (absVal, y)) => e.subst(y, AbsValExpr(absVal))
-        })
-
-        val ensuredUnified: (Expr, Map[String, Expr]) = unify(ensuredOldClosed.eval(st), Map())
-
-
-      val selModeStream = genSelMode(concValLists.flatten)
-        for (s <- selModeStream) {
-          dafny.assert(ensures.substConcVals(s)) match {
-            case Verified => {
-              val updatedProps = s.filter({ case (_, name) => name.startsWith("this.") })
-              val selfObj2 = updatedProps.foldLeft(selfObj)({
-                case (selfObj, (propVal, propName)) => {
-                  val prop = propName.stripPrefix("this.")
-                  val (selfObj2, _) = selfObj.Put(AbsString(prop), propVal.alpha, true, st.heap) // TODO: exception
-                  selfObj2
-                }
-              })
-              s.find({ case (_, name) => name == "ret" }) match {
-                case Some((retVal, _)) => return (retVal.alpha, selfObj2)
-                case None => return (retTy.absTopVal, selfObj2)
-              }
-            }
-            case _ => ()
+        case s if s.contains(".") => {
+          val xs = s.split(".") // FIXME: multi-level access
+          val x = xs.head
+          val attr = xs.tail.head
+          argValsMap.get(x) match {
+            case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
+            case None => None
           }
         }
+        case _ => None
+      }).toList
 
-        (DefaultNull.Top, selfObj)
-      } else {
-        println("Something is wrong with spec")
-        (DefaultNull.Top, selfObj)
+      if (!oldBoundAbsVals.forall(_.isDefined)) {
+        println("Undefined free vars")
+        return (DefaultNull.Top, selfObj)
       }
+
+      val oldBoundAbsVals2 = argValsMap ++ oldBoundAbsVals.flatten
+
+      val ensuredOldClosed = oldBoundAbsVals2.foldLeft(requires)({
+        case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
+      })
+
+      ensuredOldClosed.eval(st) match { // Partial evaluation
+        case Some(e) => {
+
+          val (e2, s, eq) = unify(e, Map(), List())
+
+          // TODO: dep resolution, iteration
+          // val Some(e3) = e2.eval(st)
+
+          val (eq2, s2) = eqResolve(eq, s)
+
+          val fullyFreeVars = e2.freeVars ++ eq2.flatMap({ case (u, v) => Set(u, v) })
+
+          if (fullyFreeVars.isEmpty) {
+            // DO I NEED TO CHECK AGAIN?
+
+            // substitute
+            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
+
+            // TODO: the heap effect
+
+            // self effect
+            val selfObj2 = s2.foldLeft(selfObj)({
+              case (selfObj, (x, xVal)) => {
+                if (x.startsWith("this.")) {
+                  val attr = x.stripPrefix("this.")
+                  selfObj.update(attr, AbsDataProp(xVal))
+                } else {
+                  selfObj
+                }
+              }
+            })
+
+            (retVal, selfObj2)
+          } else {
+            // Use symbolic constraint...
+            // DO I NEED TO CHECK AGAIN?
+
+            // substitute -- naive assuming that ret won't be leaked
+            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
+
+            // TODO: the heap effect
+
+            // self effect
+            val selfObj2 = s2.foldLeft(selfObj)({
+              case (o, (x, xVal)) => {
+                if (x.startsWith("this.")) {
+                  val attr = x.stripPrefix("this.")
+                  o.update(attr, AbsDataProp(xVal))
+                } else {
+                  o
+                }
+              }
+            })
+
+            // TODO: the heap symbolic effect
+
+            // self symbolic effect
+            val (selfObj3, e3) = fullyFreeVars.foldLeft(selfObj2, e2)({
+              case ((o, e), x) => {
+                if (x.startsWith("this.")) {
+                  val attr = x.stripPrefix("this.")
+                  val sym = NodeUtil.freshName(attr)
+                  (o.update(attr, AbsDataProp(AbsValue(sym))), e.subst(x, VarExpr(sym)))
+                } else {
+                  (o, e)
+                }
+              }
+            })
+
+            // TODO: the constraint effect
+
+            (retVal, selfObj3)
+          }
+        }
+      }
+    } else {
+      println("Something is wrong with spec")
+      (DefaultNull.Top, selfObj)
+    }
   }
 }
 
 case class Argument(
-    name: String,
-    ty: Type
+  name: String,
+  ty: Type
 )
 
 // FIXME: variadic functions

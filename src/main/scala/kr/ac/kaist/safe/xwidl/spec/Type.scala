@@ -5,7 +5,7 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.xwidl.solver.PackZ3
 import kr.ac.kaist.safe.xwidl.pprint._
 
-sealed trait Type extends Pack with PackZ3 {
+sealed trait Type extends PackZ3 {
   val absTopPVal: AbsPValue
 
   val absTopVal: AbsValue = AbsValue(absTopPVal)
@@ -17,8 +17,6 @@ sealed trait PrimType extends Type
 
 case object TyNum extends PrimType {
   val absTopPVal: AbsPValue = DefaultNumber.Top
-
-  def pack: Doc = text("real")
 
   def concValList: List[ConcVal] =
     // it is really hard to imagine how to represent this in a constraint solver
@@ -32,8 +30,6 @@ case object TyNum extends PrimType {
 
 case object TyInt extends PrimType {
   val absTopPVal: AbsPValue = DefaultNumber.Top
-
-  def pack: Doc = text("int")
 
   def concValList: List[ConcVal] =
     // it is really hard to imagine how to represent this in a constraint solver
@@ -51,8 +47,6 @@ case object TyInt extends PrimType {
 
 case object TyVoid extends Type {
   val absTopPVal: AbsPValue = DefaultUndef.Top
-
-  def pack: Doc = text("void")
 
   def concValList: List[ConcVal] = List()
 
