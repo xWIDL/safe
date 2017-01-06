@@ -14,6 +14,9 @@ interface Foo {
 
   int one()
        ensures ret == 1
+
+  void onlyFive(int x)
+       requires x == 5
 }
  */
 
@@ -44,6 +47,13 @@ object BuiltinFoo extends Interface(
         retTy = TyInt,
         objAddr = SystemAddr("Foo.prototype.one<object>"),
         ensures = BiOpExpr(VarExpr("ret"), EqOp, LitExpr(LitInt(1)))
+      ),
+      "onlyFive" -> Operation(
+        name = "onlyFive",
+        retTy = TyVoid,
+        args = List(Argument("x", TyInt)),
+        objAddr = SystemAddr("Foo.prototype.onlyFive<object>"),
+        requires = BiOpExpr(VarExpr("x"), EqOp, LitExpr(LitInt(5)))
       )
     )
 )

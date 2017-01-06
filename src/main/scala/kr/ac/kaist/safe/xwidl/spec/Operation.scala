@@ -80,28 +80,25 @@ case class Operation(
 
     val argValsMap: Map[String, AbsValue] = args.map(_.name).zip(argVals).toMap
 
-    val boundAbsVals: List[Option[(String, AbsValue)]] = requires.freeVars.map({
+    // TODO: sanity check of variable capturing etc....
+
+    val boundAbsVals: List[(String, AbsValue)] = requires.freeVars.flatMap({
       case s if s.startsWith("this.") => {
         val attr = s.stripPrefix("this.")
-        Some(s, selfObj.Get(attr, st.heap))
+        List((s, selfObj.Get(attr, st.heap)))
       }
       case s if s.contains(".") && !s.startsWith("this.") => {
         val (x, attr) = s.splitAt(s.indexOf(".")) // FIXME: multi-level access
         val attr2 = attr.tail
         argValsMap.get(x) match {
-          case Some(xVal) => Some(s, xVal.locset.map(st.heap.get(_).Get(attr2, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2))
-          case None => None
+          case Some(xVal) => List((s, xVal.locset.map(st.heap.get(_).Get(attr2, st.heap)).fold(DefaultValue.Bot)((v1, v2) => v1 + v2)))
+          case None => List()
         }
       }
-      case _ => None
+      case _ => List()
     }).toList
 
-    if (!boundAbsVals.forall(_.isDefined)) {
-      println("Undefined free vars")
-      return (DefaultNull.Top, selfObj)
-    }
-
-    val boundAbsVals2: List[(String, AbsValue)] = boundAbsVals.flatten ++ argValsMap
+    val boundAbsVals2: List[(String, AbsValue)] = boundAbsVals ++ argValsMap
 
     val requiresClosed = boundAbsVals2.foldLeft(requires)({
       case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
@@ -237,7 +234,7 @@ case class Operation(
         }
       }
     } else {
-      println("Something is wrong with spec")
+      println("Pre-condition of " + name + " operation is not satisfied")
       (DefaultNull.Top, selfObj)
     }
   }

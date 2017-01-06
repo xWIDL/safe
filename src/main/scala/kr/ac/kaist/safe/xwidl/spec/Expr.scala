@@ -162,7 +162,7 @@ sealed trait BiOp {
   def toEJSop: EJSOp = EJSOp(this.toString)
   def toBiExpr(e1: Expr, e2: Expr): Expr = BiOpExpr(e1, this, e2)
   def toBopHelper: (AbsValue, AbsValue) => AbsValue = this match {
-    case EqOp => Helper.bopPlus
+    case EqOp => Helper.bopEq
     case GreaterThan => Helper.bopGreater
     case GreaterEq => Helper.bopGreaterEq
     case LessEq => Helper.bopLess
