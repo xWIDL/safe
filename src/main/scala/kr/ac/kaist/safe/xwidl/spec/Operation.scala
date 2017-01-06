@@ -64,7 +64,7 @@ case class Operation(
   }
 
   private def eqResolve(eq: List[(String, String)], s: Map[String, AbsValue]): (List[(String, String)], Map[String, AbsValue]) = {
-    s.foldLeft(eq, s)({
+    s.foldLeft(eq, Map[String, AbsValue]())({
       case ((eq, s), (x, v)) => {
         if (eq.isEmpty) {
           (eq, s)
@@ -151,7 +151,7 @@ case class Operation(
         }
       }).toList
 
-      val oldBoundAbsVals2 = argValsMap ++ oldBoundAbsVals
+      val oldBoundAbsVals2 = argValsMap ++ oldBoundAbsVals.toMap
 
       val ensuredOldClosed = oldBoundAbsVals2.foldLeft(ensures)({
         case (e, (y, absVal)) => e.subst(y, AbsValExpr(absVal))
