@@ -73,8 +73,8 @@ object ObjBuilder {
                       // Print out what is wrong
                       argsMatch.filter({ case (i, matched) => !matched }).foreach({
                         case (i, _) => {
-                          println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
-                            s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
+                          println(s"[xWIDL-TYPE-ERROR] ${i}th argument ${absArgs(i)} of " +
+                            s"${interface.name}.$name is not ${op.args(i).ty}") // TODO: Precise call-site
                         }
                       })
                       (h, DefaultNull.Top, cons, excSet)
@@ -127,7 +127,7 @@ object ObjBuilder {
     )
   }
 
-  // TODO: merge two ways of building methods?
+  // TODO: merge two ways of building methods
   def buildObj(interface: Interface): ObjModel = {
     ObjModel(
       name = interface.name,
@@ -160,8 +160,8 @@ object ObjBuilder {
               // Print out what is wrong
               argsMatch.filter({ case (i, matched) => !matched }).foreach({
                 case (i, _) => {
-                  println(s"$i's argument of ${interface.name}.$name is of wrong type:" +
-                    s"${absArgs(i)} is not ${op.args(i).ty}") // FIXME: Use warning mechanism
+                  println(s"[xWIDL-TYPE-ERROR] ${i}th argument ${absArgs(i)} of " +
+                    s"${interface.name}.$name is not ${op.args(i).ty}") // TODO: Precise call-site
                 }
               })
 
