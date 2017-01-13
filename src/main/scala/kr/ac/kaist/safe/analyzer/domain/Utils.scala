@@ -42,6 +42,8 @@ object Utils {
   // location
   var AbsLoc: AbsLocUtil = _
 
+  var AbsSym: AbsSymUtil = _
+
   // value
   var AbsValue: AbsValueUtil = DefaultValue
 

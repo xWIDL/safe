@@ -21,6 +21,7 @@ object ObjBuilder {
 
   def buildPrototype(interface: Interface): ObjModel = {
     val opHashSet = interface.operations.values.map(_.objAddr).toSet
+
     ObjModel(
       name = s"${interface.name}.prototype",
       props =
@@ -30,7 +31,7 @@ object ObjBuilder {
         interface.operations.map({
           case (name, op) => NormalProp(name, FuncModel(
             name = interface.name + '.' + name,
-            code = BasicCode(argLen = op.args.length, opHashSet, (args, st) => {
+            code = BasicCode(argLen = op.args.length, opHashSet, ???, Some((args, st, node) => {
               // A rough check: If all arguments type-match, then return a most general
               // representation of the returned type
 
@@ -86,7 +87,7 @@ object ObjBuilder {
               // Then returned undefined
               val excSt = st.raiseException(excSet)
               (AbsState(retH, state.context, retPHeap), excSt, retV)
-            })
+            }))
           ), T, F, T)
         }).toList
     )

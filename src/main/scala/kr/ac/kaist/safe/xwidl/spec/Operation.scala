@@ -270,14 +270,14 @@ case class Operation(
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
                   val sym = NodeUtil.freshName(attr)
-                  (o.update(attr, AbsDataProp(AbsValue.symbolize(sym))), e.subst(x, VarExpr(sym)))
+                  (o.update(attr, AbsDataProp(AbsValue(sym))), e.subst(x, VarExpr(sym))) // FIXME: AbsValue of Symbols
                 } else {
                   (o, e)
                 }
               }
             })
 
-            (retVal, selfObj3, (e3 <&&> st.pheap).eval(st).get) // TODO: Get block ID
+            (retVal, selfObj3, /* (e3 <&&> */ st.pheap /* ).eval(st).get */ ) // TODO: Get block ID
           }
         }
       }

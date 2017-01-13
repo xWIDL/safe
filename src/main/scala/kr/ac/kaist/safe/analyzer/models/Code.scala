@@ -52,7 +52,8 @@ object EmptyCode {
 class BasicCode(
     override val argLen: Int = 0,
     addrSet: Set[Address] = HashSet(),
-    code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue)
+    code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue),
+    codeOpt: Option[(AbsValue, AbsState, CFGBlock) => (AbsState, AbsState, AbsValue)] = None // HACK
 ) extends Code {
   override def getAllAddrSet: Set[Address] = addrSet
   def getCFGFunc(cfg: CFG, name: String): CFGFunction = {
@@ -65,24 +66,28 @@ class BasicCode(
     func
   }
 
-  private def createSemanticFunc(argsName: String): SemanticFun = st => {
+  private def createSemanticFunc(argsName: String): SemanticFun = (st, node) => {
     val heap = st.heap
     val context = st.context
     val stBotPair = (AbsState.Bot, AbsState.Bot)
     val localEnv = context.pureLocal.record.decEnvRec
     val (argV, _) = localEnv.GetBindingValue(argsName)
-    val (retSt, retSte, retV) = code(argV, st)
+    val (retSt, retSte, retV) = codeOpt match {
+      case Some(f) => f(argV, st, node)
+      case None => code(argV, st)
+    }
     val (retObj, _) = localEnv.SetMutableBinding("@return", retV)
     val retCtx = retSt.context.subsPureLocal(AbsLexEnv(retObj))
-    (AbsState(retSt.heap, retCtx, retSt.constraint), retSte)
+    (AbsState(retSt.heap, retCtx, retSt.pheap), retSte)
   }
 }
 object BasicCode {
   def apply(
     argLen: Int = 0,
     addrSet: Set[Address] = HashSet(),
-    code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue)
-  ): BasicCode = new BasicCode(argLen, addrSet, code)
+    code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue),
+    codeOpt: Option[(AbsValue, AbsState, CFGBlock) => (AbsState, AbsState, AbsValue)] = None // HACK
+  ): BasicCode = new BasicCode(argLen, addrSet, code, codeOpt)
 }
 
 class CallCode(
@@ -114,7 +119,7 @@ class CallCode(
     func
   }
 
-  private def createBeforeFunc(argsName: String, newAddr: Address): SemanticFun = st => {
+  private def createBeforeFunc(argsName: String, newAddr: Address): SemanticFun = (st, _) => {
     val heap = st.heap
     val context = st.context
     val localEnv = context.pureLocal.record.decEnvRec
@@ -123,7 +128,7 @@ class CallCode(
     (newSt, newExcSt)
   }
 
-  private def createAfterFunc(argsName: String): SemanticFun = st => {
+  private def createAfterFunc(argsName: String): SemanticFun = (st, _) => {
     val heap = st.heap
     val context = st.context
     val localEnv = context.pureLocal.record.decEnvRec
