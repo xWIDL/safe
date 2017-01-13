@@ -95,7 +95,7 @@ case class Operation(
         genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
         // NOTE that we didn't erase the symbol projection in Left case
       }
-    case _ => List()
+    case _ => List(List())
   }
 
   def call(solver: Solver, st: AbsState, selfObj: AbsObject,
