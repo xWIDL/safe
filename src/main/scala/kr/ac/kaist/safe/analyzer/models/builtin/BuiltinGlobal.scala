@@ -16,7 +16,7 @@ import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.analyzer.models._
 import kr.ac.kaist.safe.analyzer._
 import kr.ac.kaist.safe.util.NodeUtil
-import kr.ac.kaist.safe.xwidl.checker.ObjBuilder
+import kr.ac.kaist.safe.xwidl.checker.ModelBuilder
 import kr.ac.kaist.safe.xwidl.spec.BuiltinFoo
 
 object BuiltinGlobal extends ObjModel(
@@ -130,11 +130,11 @@ object BuiltinGlobal extends ObjModel(
     // 15.1.4.15 URIError(...)
     NormalProp("URIError", BuiltinURIError, T, F, T),
     // 15.1.5.1 Math(...)
-    NormalProp("Math", ObjBuilder.buildObj(BuiltinMath), T, F, T),
+    NormalProp("Math", ModelBuilder.buildObj(BuiltinMath), T, F, T),
     // 15.1.5.2 JSON(...)
     NormalProp("JSON", BuiltinJSON, T, F, T),
 
-    NormalProp("Foo", ObjBuilder.buildProtoFunc(BuiltinFoo), T, F, T),
+    NormalProp("Foo", ModelBuilder.buildProtoFunc(BuiltinFoo), T, F, T),
 
     NormalProp(NodeUtil.GLOBAL_NAME, SelfModel, F, F, F),
     NormalProp(NodeUtil.VAR_TRUE, PrimModel(true), F, F, F)

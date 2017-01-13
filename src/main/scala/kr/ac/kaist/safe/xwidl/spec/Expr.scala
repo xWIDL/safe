@@ -1,9 +1,9 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-import kr.ac.kaist.safe.analyzer.Helper
+import kr.ac.kaist.safe.analyzer.{ Helper, TypeConversionHelper }
 import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
 import kr.ac.kaist.safe.analyzer.domain.{ AbsState, AbsValue, DefaultBool }
-import kr.ac.kaist.safe.analyzer.domain.Utils._
+import kr.ac.kaist.safe.analyzer.domain.Utils.{ AbsValue, _ }
 import kr.ac.kaist.safe.util.EJSOp
 import kr.ac.kaist.safe.xwidl.solver.PackZ3
 import kr.ac.kaist.safe.xwidl.pprint._
@@ -159,6 +159,7 @@ case class AbsValExpr(abs: AbsValue) extends Expr {
 }
 
 sealed trait BiOp {
+  val typeHelper = TypeConversionHelper
   def packZ3: Doc = text(this.toString)
   def toEJSop: EJSOp = EJSOp(this.toString)
   def toBiExpr(e1: Expr, e2: Expr): Expr = BiOpExpr(e1, this, e2)
@@ -171,6 +172,10 @@ sealed trait BiOp {
     case Minus => Helper.bopMinus
     case Plus => Helper.bopPlus
     case Or => Helper.bopOr
+    case Implies => (v1, v2) => {
+      val resAbsBool = typeHelper.ToBoolean(v1).negate || typeHelper.ToBoolean(v2)
+      AbsValue(resAbsBool)
+    }
   }
 }
 

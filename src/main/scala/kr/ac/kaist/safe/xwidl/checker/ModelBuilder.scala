@@ -11,7 +11,7 @@ import kr.ac.kaist.safe.xwidl.solver.Solver
 
 import scala.collection.immutable.HashSet
 
-object ObjBuilder {
+object ModelBuilder {
   var solver = new Solver(List(BuiltinMath))
 
   private def loadArg(s: String, args: AbsValue, h: AbsHeap): AbsValue =
@@ -31,7 +31,7 @@ object ObjBuilder {
         interface.operations.map({
           case (name, op) => NormalProp(name, FuncModel(
             name = interface.name + '.' + name,
-            code = BasicCode(argLen = op.args.length, opHashSet, ???, Some((args, st, node) => {
+            code = BasicCode(argLen = op.args.length, opHashSet, (_, _) => ???, Some((args, st, node) => { // HACK
               // A rough check: If all arguments type-match, then return a most general
               // representation of the returned type
 
@@ -61,7 +61,7 @@ object ObjBuilder {
                         case Some(sem) => (h, sem(st, absArgs), pheap, excSet)
                         case None => {
 
-                          val (retVal, thisObj2, retPHeap) = op.call(solver, st, thisObj, interface, absArgs)
+                          val (retVal, thisObj2, retPHeap) = op.call(solver, st, thisObj, interface, absArgs, node)
 
                           (h.update(loc, thisObj2), if (retVal.pvalue != null) {
                             retVal + value
@@ -74,8 +74,9 @@ object ObjBuilder {
                       // Print out what is wrong
                       argsMatch.filter({ case (i, matched) => !matched }).foreach({
                         case (i, _) => {
-                          println(s"[xWIDL-TYPE-ERROR] ${i}th argument ${absArgs(i)} of " +
-                            s"${interface.name}.$name is not ${op.args(i).ty}") // TODO: Precise call-site
+                          println(s"[xWIDL-TYPE-ERROR: ${node.span}] ${i}th argument ${absArgs(i)} of " +
+                            s"${interface.name}.$name is not ${op.args(i).ty}")
+                          // FIXME: it is non-trivial to find the callsite's span.
                         }
                       })
                       (h, DefaultNull.Top, pheap, excSet)

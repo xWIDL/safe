@@ -2,7 +2,7 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsPredHeap, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue, Sym }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
-import kr.ac.kaist.safe.nodes.cfg.BlockId
+import kr.ac.kaist.safe.nodes.cfg.{ BlockId, CFGBlock }
 import kr.ac.kaist.safe.util.{ Address, NodeUtil }
 import kr.ac.kaist.safe.xwidl.solver.{ Solver, Verified }
 
@@ -99,7 +99,7 @@ case class Operation(
   }
 
   def call(solver: Solver, st: AbsState, selfObj: AbsObject,
-    selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject, AbsPredHeap) = {
+    selfIface: Interface, argVals: List[AbsValue], node: CFGBlock): (AbsValue, AbsObject, AbsPredHeap) = {
 
     // S1: Instantiation
 
@@ -270,14 +270,14 @@ case class Operation(
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
                   val sym = NodeUtil.freshName(attr)
-                  (o.update(attr, AbsDataProp(AbsValue(sym))), e.subst(x, VarExpr(sym))) // FIXME: AbsValue of Symbols
+                  (o.update(attr, AbsDataProp(AbsValue(AbsSym(Sym(sym, node.id))))), e.subst(x, VarExpr(sym)))
                 } else {
                   (o, e)
                 }
               }
             })
 
-            (retVal, selfObj3, /* (e3 <&&> */ st.pheap /* ).eval(st).get */ ) // TODO: Get block ID
+            (retVal, selfObj3, st.pheap.append(node.id, e3))
           }
         }
       }

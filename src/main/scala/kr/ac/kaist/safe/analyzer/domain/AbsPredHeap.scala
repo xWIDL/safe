@@ -19,6 +19,8 @@ trait AbsPredHeap extends AbsDomain[PredHeap, AbsPredHeap] {
   // remove expression
   def remove(bid: BlockId): AbsPredHeap
 
+  def append(bid: BlockId, e: Expr): AbsPredHeap
+
   // check if some block ID is mapped
   def domIn(bid: BlockId): Boolean
 }
@@ -133,6 +135,18 @@ object DefaultPredHeap extends AbsPredHeapUtil {
       case PredHeapMap(map) => map.get(bid) match {
         case Some(obj) => obj
         case None => ExprUtil.Bot
+      }
+    }
+
+    def append(bid: BlockId, e: Expr): AbsPredHeap = this match {
+      case Top => Top
+      case heap @ PredHeapMap(map) => {
+        if (!heap.isBottom) {
+          map.get(bid) match {
+            case Some(e0) => PredHeapMap(map.updated(bid, e0 <&&> e))
+            case None => PredHeapMap(map.updated(bid, e))
+          }
+        } else heap
       }
     }
 

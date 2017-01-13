@@ -42,7 +42,7 @@ object Utils {
   // location
   var AbsLoc: AbsLocUtil = _
 
-  var AbsSym: AbsSymUtil = _
+  var AbsSym: AbsSymUtil = DefaultSym(Set()) // XXX: So, what does an empty default symbol set mean?
 
   // value
   var AbsValue: AbsValueUtil = DefaultValue

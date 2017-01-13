@@ -42,6 +42,7 @@ trait AbsValue extends AbsDomain[Value, AbsValue] {
 trait AbsValueUtil extends AbsDomainUtil[Value, AbsValue] {
   def apply(pvalue: AbsPValue): AbsValue
   def apply(locset: AbsLoc): AbsValue
+  def apply(sym: AbsSym): AbsValue
   def apply(pvalue: AbsPValue, locset: AbsLoc): AbsValue
 }
 
@@ -49,8 +50,8 @@ trait AbsValueUtil extends AbsDomainUtil[Value, AbsValue] {
 // default value abstract domain
 ////////////////////////////////////////////////////////////////////////////////
 object DefaultValue extends AbsValueUtil {
-  lazy val Bot: Dom = Dom(AbsPValue.Bot, AbsLoc.Bot)
-  lazy val Top: Dom = Dom(AbsPValue.Top, AbsLoc.Top)
+  lazy val Bot: Dom = Dom(AbsPValue.Bot, AbsLoc.Bot, AbsSym.Bot)
+  lazy val Top: Dom = Dom(AbsPValue.Top, AbsLoc.Top, AbsSym.Bot)
 
   def alpha(value: Value): AbsValue = value match {
     case (pvalue: PValue) => apply(AbsPValue(pvalue))
@@ -60,9 +61,10 @@ object DefaultValue extends AbsValueUtil {
   def apply(pvalue: AbsPValue): AbsValue = Bot.copy(pvalue = pvalue)
   def apply(sym: AbsSym): AbsValue = Bot.copy(symbol = sym)
   def apply(locset: AbsLoc): AbsValue = Bot.copy(locset = locset)
-  def apply(pvalue: AbsPValue, locset: AbsLoc): AbsValue = Dom(pvalue, locset)
+  def apply(pvalue: AbsPValue, locset: AbsLoc): AbsValue =
+    Bot.copy(pvalue = pvalue, locset = locset)
 
-  case class Dom(pvalue: AbsPValue, locset: AbsLoc, symbol: AbsSym = AbsSym.Bot) extends AbsValue {
+  case class Dom(pvalue: AbsPValue, locset: AbsLoc, symbol: AbsSym) extends AbsValue {
     def gamma: ConSet[Value] = ConInf() // TODO more precisely
 
     def isBottom: Boolean = this == Bot
@@ -80,7 +82,8 @@ object DefaultValue extends AbsValueUtil {
       val (left, right) = (this, check(that))
       Dom(
         left.pvalue + right.pvalue,
-        left.locset + right.locset
+        left.locset + right.locset,
+        left.symbol + right.symbol
       )
     }
 
@@ -88,7 +91,8 @@ object DefaultValue extends AbsValueUtil {
       val (left, right) = (this, check(that))
       Dom(
         left.pvalue <> right.pvalue,
-        left.locset <> right.locset
+        left.locset <> right.locset,
+        left.symbol <> right.symbol
       )
     }
 
@@ -111,10 +115,10 @@ object DefaultValue extends AbsValueUtil {
     }
 
     def subsLoc(locR: Loc, locO: Loc): AbsValue =
-      Dom(this.pvalue, this.locset.subsLoc(locR, locO))
+      Dom(this.pvalue, this.locset.subsLoc(locR, locO), this.symbol)
 
     def weakSubsLoc(locR: Loc, locO: Loc): AbsValue =
-      Dom(this.pvalue, this.locset.weakSubsLoc(locR, locO))
+      Dom(this.pvalue, this.locset.weakSubsLoc(locR, locO), this.symbol)
 
     def typeCount: Int = {
       if (this.locset.isBottom)
