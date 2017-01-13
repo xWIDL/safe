@@ -11,8 +11,6 @@
 
 package kr.ac.kaist.safe.analyzer.domain
 
-import kr.ac.kaist.safe.xwidl.spec.{ Expr, LitExpr, LitBool }
-
 // abstract domain
 trait AbsDomain[C, Self <: AbsDomain[C, _]] extends Domain[Self] {
   // concretization

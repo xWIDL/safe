@@ -68,6 +68,8 @@ object Utils {
   // heap
   var AbsHeap: AbsHeapUtil = DefaultHeap
 
+  var AbsPredHeap: AbsPredHeapUtil = DefaultPredHeap
+
   // state
   var AbsState: AbsStateUtil = DefaultState
 

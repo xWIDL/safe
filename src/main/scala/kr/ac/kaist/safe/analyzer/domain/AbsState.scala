@@ -17,7 +17,6 @@ import kr.ac.kaist.safe.analyzer.models.builtin.BuiltinGlobal
 import kr.ac.kaist.safe.LINE_SEP
 import kr.ac.kaist.safe.nodes.cfg._
 import kr.ac.kaist.safe.util.{ Address, SystemAddr }
-import kr.ac.kaist.safe.xwidl.spec._
 
 ////////////////////////////////////////////////////////////////////////////////
 // concrete state type
@@ -30,7 +29,7 @@ trait State // TODO
 trait AbsState extends AbsDomain[State, AbsState] {
   val heap: AbsHeap
   val context: AbsContext
-  val constraint: Expr
+  val pheap: AbsPredHeap
 
   def raiseException(excSet: Set[Exception]): AbsState
   def oldify(addr: Address): AbsState
@@ -54,7 +53,7 @@ trait AbsState extends AbsDomain[State, AbsState] {
 }
 
 trait AbsStateUtil extends AbsDomainUtil[State, AbsState] {
-  def apply(heap: AbsHeap, context: AbsContext, constraint: Expr): AbsState
+  def apply(heap: AbsHeap, context: AbsContext, pheap: AbsPredHeap): AbsState
   def apply(heap: AbsHeap, context: AbsContext): AbsState
 }
 
@@ -62,18 +61,18 @@ trait AbsStateUtil extends AbsDomainUtil[State, AbsState] {
 // default state abstract domain
 ////////////////////////////////////////////////////////////////////////////////
 object DefaultState extends AbsStateUtil {
-  lazy val Bot: AbsState = Dom(AbsHeap.Bot, AbsContext.Bot, LitExpr(LitBool(false)))
-  lazy val Top: AbsState = Dom(AbsHeap.Top, AbsContext.Top, LitExpr(LitBool(true)))
+  lazy val Bot: AbsState = Dom(AbsHeap.Bot, AbsContext.Bot, AbsPredHeap.Bot)
+  lazy val Top: AbsState = Dom(AbsHeap.Top, AbsContext.Top, AbsPredHeap.Top)
 
   def alpha(st: State): AbsState = Top // TODO more precise
 
-  def apply(heap: AbsHeap, context: AbsContext, constraint: Expr): AbsState = Dom(heap, context, constraint)
-  def apply(heap: AbsHeap, context: AbsContext): AbsState = Dom(heap, context, LitExpr(LitBool(true)))
+  def apply(heap: AbsHeap, context: AbsContext, pheap: AbsPredHeap): AbsState = Dom(heap, context, pheap)
+  def apply(heap: AbsHeap, context: AbsContext): AbsState = Dom(heap, context, AbsPredHeap.Bot) // XXX: Bot?
 
   case class Dom(
       heap: AbsHeap,
       context: AbsContext,
-      constraint: Expr
+      pheap: AbsPredHeap
   ) extends AbsState {
     def gamma: ConSet[State] = ConInf() // TODO more precise
 
@@ -86,10 +85,10 @@ object DefaultState extends AbsStateUtil {
       this.heap <= that.heap && this.context <= that.context
 
     def +(that: AbsState): AbsState =
-      Dom(this.heap + that.heap, this.context + that.context, (this.constraint <||> that.constraint).eval(this).get)
+      Dom(this.heap + that.heap, this.context + that.context, this.pheap + that.pheap)
 
     def <>(that: AbsState): AbsState =
-      Dom(this.heap <> that.heap, this.context <> that.context, (this.constraint <&&> that.constraint).eval(this).get)
+      Dom(this.heap <> that.heap, this.context <> that.context, this.pheap <> that.pheap)
 
     def raiseException(excSet: Set[Exception]): AbsState = {
       if (excSet.isEmpty) Bot
@@ -104,7 +103,7 @@ object DefaultState extends AbsStateUtil {
             val (protoModel, _, _, _) = errModel.protoModel.get
             val newErrObj = AbsObject.newErrorObj(errModel.name, protoModel.loc)
             val retH = newSt.heap.update(loc, newErrObj)
-            (Dom(retH, newSt.context, newSt.constraint), locSet + loc)
+            (Dom(retH, newSt.context, newSt.pheap), locSet + loc)
           }
         }
         val excValue = AbsValue(newExcSet)
@@ -112,12 +111,12 @@ object DefaultState extends AbsStateUtil {
         val (envRec1, _) = localEnv.record.decEnvRec.SetMutableBinding("@exception", excValue)
         val (envRec2, _) = envRec1.SetMutableBinding("@exception_all", excValue + oldValue)
         val newCtx = newSt.context.subsPureLocal(localEnv.copyWith(record = envRec2))
-        Dom(newSt.heap, newCtx, newSt.constraint)
+        Dom(newSt.heap, newCtx, newSt.pheap)
       }
     }
 
     def oldify(addr: Address): AbsState = {
-      Dom(this.heap.oldify(addr), this.context.oldify(addr), this.constraint) // XXX: ?
+      Dom(this.heap.oldify(addr), this.context.oldify(addr), this.pheap) // XXX: ?
     }
 
     ////////////////////////////////////////////////////////////////
@@ -162,7 +161,7 @@ object DefaultState extends AbsStateUtil {
             .CreateMutableBinding(x).fold(envRec)((e: AbsDecEnvRec) => e)
             .SetMutableBinding(x, value)
           val newEnv = localEnv.copyWith(record = newEnvRec)
-          Dom(heap, context.subsPureLocal(newEnv), constraint)
+          Dom(heap, context.subsPureLocal(newEnv), pheap)
         case CapturedVar =>
           val (newSt, _) = AbsLexEnv.setId(localEnv.outer, x, value, false)(this)
           newSt
@@ -171,11 +170,11 @@ object DefaultState extends AbsStateUtil {
           val (newEnv, _) = env
             .CreateMutableBinding(x).fold(env)((e: AbsDecEnvRec) => e)
             .SetMutableBinding(x, value)
-          Dom(heap, context.update(PredefLoc.COLLAPSED, AbsLexEnv(newEnv)), constraint)
+          Dom(heap, context.update(PredefLoc.COLLAPSED, AbsLexEnv(newEnv)), pheap)
         case GlobalVar =>
           val (_, newH, _) = AbsGlobalEnvRec.Top
             .SetMutableBinding(x, value, false)(heap)
-          Dom(newH, context, constraint)
+          Dom(newH, context, pheap)
       }
     }
 
@@ -191,7 +190,7 @@ object DefaultState extends AbsStateUtil {
           val (newEnvRec, _) = envRec
             .CreateMutableBinding(x).fold(envRec)((e: AbsDecEnvRec) => e)
             .SetMutableBinding(x, value)
-          Dom(heap, context.subsPureLocal(env.copyWith(record = newEnvRec)), constraint)
+          Dom(heap, context.subsPureLocal(env.copyWith(record = newEnvRec)), pheap)
         case CapturedVar =>
           val bind = AbsBinding(value)
           val newCtx = context.pureLocal.outer.foldLeft(AbsContext.Bot)((tmpCtx, loc) => {
@@ -202,7 +201,7 @@ object DefaultState extends AbsStateUtil {
               .SetMutableBinding(x, value)
             tmpCtx + context.update(loc, env.copyWith(record = newEnvRec))
           })
-          Dom(heap, newCtx, constraint)
+          Dom(heap, newCtx, pheap)
         case CapturedCatchVar =>
           val collapsedLoc = PredefLoc.COLLAPSED
           val env = context.getOrElse(collapsedLoc, AbsLexEnv.Bot)
@@ -210,14 +209,14 @@ object DefaultState extends AbsStateUtil {
           val (newEnvRec, _) = envRec
             .CreateMutableBinding(x).fold(envRec)((e: AbsDecEnvRec) => e)
             .SetMutableBinding(x, value)
-          Dom(heap, context.update(collapsedLoc, env.copyWith(record = newEnvRec)), constraint)
+          Dom(heap, context.update(collapsedLoc, env.copyWith(record = newEnvRec)), pheap)
         case GlobalVar =>
           val globalLoc = BuiltinGlobal.loc
           val objV = AbsDataProp(value, AbsBool.True, AbsBool.True, AbsBool.False)
           val newHeap =
             if (AbsBool.True == heap.get(globalLoc).HasProperty(AbsString(x), heap)) heap
             else heap.update(globalLoc, heap.get(globalLoc).update(x, objV))
-          Dom(newHeap, context, constraint)
+          Dom(newHeap, context, pheap)
       }
     }
 
@@ -228,7 +227,7 @@ object DefaultState extends AbsStateUtil {
       val absStr = AbsString(str)
       val (newHeap, b1) = heap.delete(loc, absStr)
       val (newCtx, b2) = context.delete(loc, str)
-      (Dom(newHeap, newCtx, constraint), b1 + b2)
+      (Dom(newHeap, newCtx, pheap), b1 + b2)
     }
 
     override def toString: String = toString(false)
@@ -251,7 +250,7 @@ object DefaultState extends AbsStateUtil {
         context.old.toString +
         LINE_SEP +
         "** constraint **" + LINE_SEP +
-        constraint
+        pheap
     }
   }
 }

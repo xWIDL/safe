@@ -33,6 +33,11 @@ sealed trait Expr extends PackZ3 {
   def <&&>(e2: Expr): Expr = BiOpExpr(this, And, e2)
 }
 
+object ExprUtil {
+  val Top: Expr = LitExpr(LitBool(true))
+  val Bot: Expr = LitExpr(LitBool(false))
+}
+
 case class IfThenElseExpr(
     cond: Expr,
     thenBranch: Expr,
