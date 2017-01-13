@@ -190,7 +190,7 @@ case class Operation(
             }
           }
         }
-        case s if s.startsWith("this.") || argValsMap.isDefinedAt(s) => List()
+        case s if s.startsWith("this.") || argValsMap.isDefinedAt(s) || s == "ret" => List()
         case _ => {
           println("Something is wrong")
           List()
