@@ -26,7 +26,7 @@ abstract class Value
 trait AbsValue extends AbsDomain[Value, AbsValue] {
   val pvalue: AbsPValue
   val locset: AbsLoc
-  val symbol: Option[String]
+  val symbol: AbsSym
 
   /* substitute locR by locO */
   def subsLoc(locR: Loc, locO: Loc): AbsValue

@@ -1,7 +1,8 @@
 package kr.ac.kaist.safe.xwidl.spec
 
-import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue }
+import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsPredHeap, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue, Sym }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
+import kr.ac.kaist.safe.nodes.cfg.BlockId
 import kr.ac.kaist.safe.util.{ Address, NodeUtil }
 import kr.ac.kaist.safe.xwidl.solver.{ Solver, Verified }
 
@@ -76,7 +77,31 @@ case class Operation(
     })
   }
 
-  def call(dafny: Solver, st: AbsState, selfObj: AbsObject, selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject, Expr) = {
+  private def genConfig(
+    m: List[(String, AbsValue)],
+    keys: Set[BlockId]
+  ): List[List[(String, Either[AbsValue, Sym])]] = m match {
+    case (x, v) :: xs =>
+      if (v.symbol.isBottom) {
+        genConfig(xs, keys).map((x, Left(v)) :: _)
+      } else {
+        val inter: Set[BlockId] = v.symbol.map(_.tag) intersect keys
+        val symConfigs = if (inter.isEmpty) {
+          v.symbol.map(s => genConfig(xs, keys + s.tag).map((x, Right(s)) :: _)).flatten.toList
+        } else {
+          genConfig(xs, keys).map((x, Right(v.symbol.map(identity).head)) :: _)
+        }
+
+        genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
+        // NOTE that we didn't erase the symbol projection in Left case
+      }
+    case _ => List()
+  }
+
+  def call(solver: Solver, st: AbsState, selfObj: AbsObject,
+    selfIface: Interface, argVals: List[AbsValue]): (AbsValue, AbsObject, AbsPredHeap) = {
+
+    // S1: Instantiation
 
     val argValsMap: Map[String, AbsValue] = args.map(_.name).zip(argVals).toMap
 
@@ -99,30 +124,46 @@ case class Operation(
       case _ => List()
     }).toList
 
-    val boundAbsVals2: List[(String, AbsValue)] = boundAbsVals ++ argValsMap
+    val absValMap: List[(String, AbsValue)] = boundAbsVals ++ argValsMap
 
-    val requiresClosed = boundAbsVals2.foldLeft(requires)({
-      case (e, (y, absVal)) => {
-        absVal.symbol match {
-          case Some(s) => e.subst(y, VarExpr(s))
-          case None => e.subst(y, AbsValExpr(absVal))
+    // S2: Config Gen
+
+    val configs: List[List[(String, Either[AbsValue, Sym])]] = genConfig(absValMap, Set())
+
+    // S3: VC Gen and check
+
+    val reqSatisfied = configs.forall(c => {
+
+      val requiresInstantiated = c.foldLeft(requires)({
+        case (e, (y, absValOrSym)) =>
+          absValOrSym match {
+            case Left(v) => e.subst(y, AbsValExpr(v))
+            case Right(s) => e.subst(y, VarExpr(s.toString))
+          }
+      })
+
+      val relevantKeys: Set[BlockId] = c.foldLeft(Set[BlockId]())({
+        case (s, (_, absValOrSym)) =>
+          absValOrSym match {
+            case Left(_) => s
+            case Right(sym) => s + sym.tag
+          }
+      })
+
+      val cond: Expr = relevantKeys.foldLeft(ExprUtil.Top)({
+        case (e, id) => e <&&> st.pheap.get(id)
+      }) // TODO: rewrite?
+
+      (cond <=>> requiresInstantiated).eval(st) match {
+        case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
+        case Some(e) => solver.assert(e) match {
+          // symbolic judgement
+          case Verified => true
+          case _ => false
         }
+        case None => false
       }
     })
-
-    // it might not be closed -- since some AbsValue are actually symbols
-    // in that case, we will need to conjunct this with the constraint
-    // and use SMT to solve that awkward condition
-
-    val reqSatisfied = requiresClosed.eval(st) match {
-      case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
-      case Some(e) => dafny.assert(BiOpExpr(e, And, st.constraint)) match {
-        // symbolic judgement
-        case Verified => true
-        case _ => false
-      }
-      case None => false
-    }
 
     if (reqSatisfied) {
       // Instead of generating the stream for everything, we should
@@ -166,7 +207,7 @@ case class Operation(
         // Partial evaluation
         case None => {
           println("Something goes wrong")
-          (DefaultValue.Top, selfObj, st.constraint)
+          (DefaultValue.Top, selfObj, st.pheap)
         }
         case Some(e) => {
 
@@ -199,7 +240,7 @@ case class Operation(
               }
             })
 
-            (retVal, selfObj2, st.constraint)
+            (retVal, selfObj2, st.pheap)
           } else {
             // Use symbolic constraint...
             // DO I NEED TO CHECK AGAIN?
@@ -236,13 +277,13 @@ case class Operation(
               }
             })
 
-            (retVal, selfObj3, (e3 <&&> st.constraint).eval(st).get)
+            (retVal, selfObj3, (e3 <&&> st.pheap).eval(st).get) // TODO: Get block ID
           }
         }
       }
     } else {
       println("Pre-condition of " + name + " operation is not satisfied")
-      (DefaultNull.Top, selfObj, st.constraint)
+      (DefaultNull.Top, selfObj, st.pheap)
     }
   }
 }

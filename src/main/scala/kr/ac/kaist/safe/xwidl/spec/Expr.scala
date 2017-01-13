@@ -31,6 +31,7 @@ sealed trait Expr extends PackZ3 {
 
   def <||>(e2: Expr): Expr = BiOpExpr(this, Or, e2)
   def <&&>(e2: Expr): Expr = BiOpExpr(this, And, e2)
+  def <=>>(e2: Expr): Expr = BiOpExpr(this, Implies, e2)
 }
 
 object ExprUtil {
@@ -154,12 +155,7 @@ case class AbsValExpr(abs: AbsValue) extends Expr {
   def freeVars: Set[String] = Set() // really?
   def subst(x: String, v: Expr): Expr = this
   def packZ3: Doc = text(abs.toString)
-  def eval(st: AbsState): Option[Expr] = {
-    abs.symbol match {
-      case Some(s) => Some(VarExpr(s))
-      case None => Some(this)
-    }
-  }
+  def eval(st: AbsState): Option[Expr] = Some(this)
 }
 
 sealed trait BiOp {
@@ -204,6 +200,9 @@ case object Minus extends BiOp {
 }
 case object Plus extends BiOp {
   override def toString: String = "+"
+}
+case object Implies extends BiOp {
+  override def toString: String = "=>"
 }
 sealed trait Literal extends PackZ3 {
   def alpha: AbsValue
