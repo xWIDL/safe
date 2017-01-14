@@ -92,7 +92,12 @@ case class Operation(
           genConfig(xs, keys).map((x, Right(v.symbol.map(identity).head)) :: _)
         }
 
-        genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
+        if (v.pvalue.isBottom) {
+          // FIXME: locset?
+          symConfigs
+        } else {
+          genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
+        }
         // NOTE that we didn't erase the symbol projection in Left case
       }
     case _ => List(List())
@@ -154,9 +159,15 @@ case class Operation(
         case (e, id) => e <&&> st.pheap.get(id)
       }) // TODO: rewrite?
 
-      (cond <=>> requiresInstantiated).eval(st) match {
+      val target = cond <=>> requiresInstantiated
+
+      val targetClosed = target.freeVars.foldLeft(target)({
+        case (e, x) => ExistsExpr(x, TyInt, e) // FIXME: fetch type info from spec
+      })
+
+      targetClosed.eval(st) match {
         case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
-        case Some(e) => solver.assert(e) match {
+        case Some(e) => solver.assert(e.rename("s")) match {
           // symbolic judgement
           case Verified => true
           case _ => false
@@ -269,15 +280,16 @@ case class Operation(
               case ((o, e), x) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
-                  val sym = NodeUtil.freshName(attr)
-                  (o.update(attr, AbsDataProp(AbsValue(AbsSym(Sym(sym, node.id))))), e.subst(x, VarExpr(sym)))
+                  val sym = Sym(NodeUtil.freshName(attr), node.id)
+                  (o.update(attr, AbsDataProp(AbsValue(AbsSym(sym)))), e.subst(x, VarExpr(sym.toString)))
                 } else {
                   (o, e)
                 }
               }
             })
 
-            (retVal, selfObj3, st.pheap.append(node.id, e3))
+            val updatedPHeap = st.pheap.append(node.id, e3);
+            (retVal, selfObj3, updatedPHeap)
           }
         }
       }

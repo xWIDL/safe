@@ -18,6 +18,9 @@ sealed trait Expr extends PackZ3 {
    * We need to process qualifiers etc. Maybe implication and more exotic thing in the future
    */
 
+  def rename(prefix: String): Expr
+  // rename to make Z3 happy
+
   def substConcVal(concVal: ConcVal, y: String): Expr = concVal match {
     case PredicateVal(x, ty, constraint, _) => {
       ExistsExpr(x, ty, BiOpExpr(this.subst(y, VarExpr(x)), And, constraint)) // TODO: alpha conversion
@@ -54,6 +57,9 @@ case class IfThenElseExpr(
   def packZ3: Doc =
     parens(text("if") <+> cond.packZ3 <+> thenBranch.packZ3 <+> elseBranch.packZ3)
 
+  def rename(prefix: String): Expr =
+    IfThenElseExpr(cond.rename(prefix), thenBranch.rename(prefix), elseBranch.rename(prefix))
+
   def eval(st: AbsState): Option[Expr] = {
     lazy val thenBranchVal = thenBranch.eval(st)
     lazy val elseBranchVal = elseBranch.eval(st)
@@ -87,6 +93,8 @@ case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
   def packZ3: Doc =
     parens(op.packZ3 <+> le.packZ3 <+> re.packZ3)
 
+  def rename(prefix: String): Expr = BiOpExpr(le.rename(prefix), op, re.rename(prefix))
+
   private def biOpEvalHelper(le: Expr, re: Expr,
     fe: (Expr, Expr) => Expr,
     fv: (AbsValue, AbsValue) => AbsValue): Expr = {
@@ -105,6 +113,8 @@ case class VarExpr(name: String) extends Expr {
 
   def subst(x: String, v: Expr): Expr = if (x == name) { v } else { this }
 
+  def rename(prefix: String): Expr = this
+
   def packZ3: Doc = text(name)
 
   def eval(st: AbsState): Option[Expr] = Some(this)
@@ -118,6 +128,9 @@ case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
     } else {
       ForallExpr(x, ty, e.subst(y, v))
     }
+
+  def rename(prefix: String): Expr =
+    ForallExpr(prefix + "0", ty, e.subst(x, VarExpr(prefix + "0")).rename(prefix + "1"))
 
   def packZ3: Doc = parens(text("forall") <+> parens(parens(text(x) <+> ty.packZ3)) <+> e.packZ3)
 
@@ -136,6 +149,9 @@ case class ExistsExpr(x: String, ty: Type, e: Expr) extends Expr {
     }
   def packZ3: Doc = parens(text("exists") <+> parens(parens(text(x) <+> ty.packZ3)) <+> e.packZ3)
 
+  def rename(prefix: String): Expr =
+    ExistsExpr(prefix + "0", ty, e.subst(x, VarExpr(prefix + "0")).rename(prefix + "1"))
+
   def eval(st: AbsState): Option[Expr] = e.eval(st).map(ExistsExpr(x, ty, _))
   // partially evaluate the body
 }
@@ -148,12 +164,15 @@ case class LitExpr(lit: Literal) extends Expr {
 
   def packZ3: Doc = lit.packZ3
 
+  def rename(prefix: String): Expr = this
+
   def eval(st: AbsState): Option[Expr] = Some(AbsValExpr(lit.alpha))
 }
 
 case class AbsValExpr(abs: AbsValue) extends Expr {
   def freeVars: Set[String] = Set() // really?
   def subst(x: String, v: Expr): Expr = this
+  def rename(prefix: String): Expr = this
   def packZ3: Doc = text(abs.toString)
   def eval(st: AbsState): Option[Expr] = Some(this)
 }

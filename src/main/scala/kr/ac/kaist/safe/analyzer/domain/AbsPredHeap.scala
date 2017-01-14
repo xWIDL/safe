@@ -141,12 +141,10 @@ object DefaultPredHeap extends AbsPredHeapUtil {
     def append(bid: BlockId, e: Expr): AbsPredHeap = this match {
       case Top => Top
       case heap @ PredHeapMap(map) => {
-        if (!heap.isBottom) {
-          map.get(bid) match {
-            case Some(e0) => PredHeapMap(map.updated(bid, e0 <&&> e))
-            case None => PredHeapMap(map.updated(bid, e))
-          }
-        } else heap
+        map.get(bid) match {
+          case Some(e0) => PredHeapMap(map.updated(bid, e0 <&&> e))
+          case None => PredHeapMap(map.updated(bid, e))
+        }
       }
     }
 

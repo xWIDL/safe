@@ -54,18 +54,18 @@ object BuiltinFoo extends Interface(
         args = List(Argument("x", TyInt)),
         objAddr = SystemAddr("Foo.prototype.onlyFive<object>"),
         requires = BiOpExpr(VarExpr("x"), EqOp, LitExpr(LitInt(5)))
+      ),
+      "makeBiggerFive" -> Operation(
+        name = "makeBiggerFive",
+        retTy = TyVoid,
+        objAddr = SystemAddr("Foo.prototype.makeBiggerFive<object>"),
+        ensures = BiOpExpr(VarExpr("this.count"), GreaterEq, LitExpr(LitInt(5)))
+      ),
+      "needBiggerFour" -> Operation(
+        name = "needBiggerFour",
+        retTy = TyVoid,
+        objAddr = SystemAddr("Foo.prototype.needBiggerFour<object>"),
+        requires = BiOpExpr(VarExpr("this.count"), GreaterEq, LitExpr(LitInt(4)))
       )
-    //      "biggerFive" -> Operation(
-    //        name = "biggerFive",
-    //        retTy = TyVoid,
-    //        objAddr = SystemAddr("Foo.prototype.biggerFive<object>"),
-    //        ensures = BiOpExpr(VarExpr("this.count"), GreaterEq, LitExpr(LitInt(5)))
-    //      ),
-    //      "biggerFour" -> Operation(
-    //        name = "biggerFour",
-    //        retTy = TyVoid,
-    //        objAddr = SystemAddr("Foo.prototype.biggerFour<object>"),
-    //        requires = BiOpExpr(VarExpr("this.count"), GreaterEq, LitExpr(LitInt(4)))
-    //      )
     )
 )
