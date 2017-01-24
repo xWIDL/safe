@@ -21,7 +21,8 @@ object Utils {
     absBool: AbsBoolUtil,
     absNumber: AbsNumberUtil,
     absString: AbsStringUtil,
-    absLoc: AbsLocUtil
+    absLoc: AbsLocUtil,
+    absSym: AbsSymUtil
   ): Unit = {
     AbsUndef = absUndef
     AbsNull = absNull
@@ -29,6 +30,7 @@ object Utils {
     AbsNumber = absNumber
     AbsString = absString
     AbsLoc = absLoc
+    AbsSym = absSym
   }
 
   // primitive values
@@ -42,7 +44,7 @@ object Utils {
   // location
   var AbsLoc: AbsLocUtil = _
 
-  var AbsSym: AbsSymUtil = DefaultSym(Set()) // XXX: So, what does an empty default symbol set mean?
+  var AbsSym: AbsSymUtil = _ // XXX: So, what does an empty default symbol set mean?
 
   // value
   var AbsValue: AbsValueUtil = DefaultValue

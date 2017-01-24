@@ -38,7 +38,8 @@ case object Analyze extends PhaseObj[CFG, AnalyzeConfig, (CFG, Int, CallContext,
       config.AbsBool,
       config.AbsNumber,
       config.AbsString,
-      DefaultLoc(cfg)
+      DefaultLoc(cfg),
+      DefaultSym(Set()) // FIXME: All symbols?
     )
     var initSt = Initialize(cfg)
 

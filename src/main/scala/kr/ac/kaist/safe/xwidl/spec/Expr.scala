@@ -2,7 +2,7 @@ package kr.ac.kaist.safe.xwidl.spec
 
 import kr.ac.kaist.safe.analyzer.{ Helper, TypeConversionHelper }
 import kr.ac.kaist.safe.analyzer.domain.DefaultNumber.UIntConst
-import kr.ac.kaist.safe.analyzer.domain.{ AbsState, AbsValue, DefaultBool }
+import kr.ac.kaist.safe.analyzer.domain.{ AbsState, AbsValue, DefaultBool, DefaultSym, Sym }
 import kr.ac.kaist.safe.analyzer.domain.Utils.{ AbsValue, _ }
 import kr.ac.kaist.safe.util.EJSOp
 import kr.ac.kaist.safe.xwidl.solver.PackZ3
@@ -21,6 +21,8 @@ sealed trait Expr extends PackZ3 {
   def rename(prefix: String): Expr
   // rename to make Z3 happy
 
+  def symbolToVal: Expr
+
   def substConcVal(concVal: ConcVal, y: String): Expr = concVal match {
     case PredicateVal(x, ty, constraint, _) => {
       ExistsExpr(x, ty, BiOpExpr(this.subst(y, VarExpr(x)), And, constraint)) // TODO: alpha conversion
@@ -35,6 +37,8 @@ sealed trait Expr extends PackZ3 {
   def <||>(e2: Expr): Expr = BiOpExpr(this, Or, e2)
   def <&&>(e2: Expr): Expr = BiOpExpr(this, And, e2)
   def <=>>(e2: Expr): Expr = BiOpExpr(this, Implies, e2)
+
+  override def toString: String = showDoc(80, packZ3)
 }
 
 object ExprUtil {
@@ -56,6 +60,8 @@ case class IfThenElseExpr(
 
   def packZ3: Doc =
     parens(text("if") <+> cond.packZ3 <+> thenBranch.packZ3 <+> elseBranch.packZ3)
+
+  def symbolToVal: Expr = IfThenElseExpr(cond.symbolToVal, thenBranch.symbolToVal, elseBranch.symbolToVal)
 
   def rename(prefix: String): Expr =
     IfThenElseExpr(cond.rename(prefix), thenBranch.rename(prefix), elseBranch.rename(prefix))
@@ -95,11 +101,13 @@ case class BiOpExpr(le: Expr, op: BiOp, re: Expr) extends Expr {
 
   def rename(prefix: String): Expr = BiOpExpr(le.rename(prefix), op, re.rename(prefix))
 
+  def symbolToVal: Expr = BiOpExpr(le.symbolToVal, op, re.symbolToVal)
+
   private def biOpEvalHelper(le: Expr, re: Expr,
     fe: (Expr, Expr) => Expr,
     fv: (AbsValue, AbsValue) => AbsValue): Expr = {
     (le, re) match {
-      case (AbsValExpr(la), AbsValExpr(ra)) => AbsValExpr(fv(la, ra))
+      case (AbsValExpr(la), AbsValExpr(ra)) if la.symbol.isBottom && ra.symbol.isBottom => AbsValExpr(fv(la, ra))
       case _ => fe(le, re)
     }
   }
@@ -112,6 +120,8 @@ case class VarExpr(name: String) extends Expr {
   def freeVars: Set[String] = Set(name)
 
   def subst(x: String, v: Expr): Expr = if (x == name) { v } else { this }
+
+  def symbolToVal: Expr = this
 
   def rename(prefix: String): Expr = this
 
@@ -128,6 +138,8 @@ case class ForallExpr(x: String, ty: Type, e: Expr) extends Expr {
     } else {
       ForallExpr(x, ty, e.subst(y, v))
     }
+
+  def symbolToVal: Expr = ForallExpr(x, ty, e.symbolToVal)
 
   def rename(prefix: String): Expr =
     ForallExpr(prefix + "0", ty, e.subst(x, VarExpr(prefix + "0")).rename(prefix + "1"))
@@ -149,6 +161,8 @@ case class ExistsExpr(x: String, ty: Type, e: Expr) extends Expr {
     }
   def packZ3: Doc = parens(text("exists") <+> parens(parens(text(x) <+> ty.packZ3)) <+> e.packZ3)
 
+  def symbolToVal: Expr = ExistsExpr(x, ty, e.symbolToVal)
+
   def rename(prefix: String): Expr =
     ExistsExpr(prefix + "0", ty, e.subst(x, VarExpr(prefix + "0")).rename(prefix + "1"))
 
@@ -164,6 +178,8 @@ case class LitExpr(lit: Literal) extends Expr {
 
   def packZ3: Doc = lit.packZ3
 
+  def symbolToVal: Expr = this
+
   def rename(prefix: String): Expr = this
 
   def eval(st: AbsState): Option[Expr] = Some(AbsValExpr(lit.alpha))
@@ -173,6 +189,13 @@ case class AbsValExpr(abs: AbsValue) extends Expr {
   def freeVars: Set[String] = Set() // really?
   def subst(x: String, v: Expr): Expr = this
   def rename(prefix: String): Expr = this
+  def symbolToVal: Expr = {
+    val ss = abs.symbol.map(identity).toList
+    ss match {
+      case s :: _ => VarExpr(s.toString)
+      case _ => this
+    }
+  }
   def packZ3: Doc = text(abs.toString)
   def eval(st: AbsState): Option[Expr] = Some(this)
 }

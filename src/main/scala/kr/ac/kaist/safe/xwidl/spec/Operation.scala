@@ -157,7 +157,9 @@ case class Operation(
       })
 
       val cond: Expr = relevantKeys.foldLeft(ExprUtil.Top)({
-        case (e, id) => e <&&> st.pheap.get(id)
+        case (e, id) => {
+          e <&&> st.pheap.get(id)
+        }
       }) // TODO: rewrite?
 
       val target = cond <=>> requiresInstantiated
@@ -294,7 +296,9 @@ case class Operation(
               case (e, (a, b)) => e <&&> BiOpExpr(VarExpr(a), EqOp, VarExpr(b))
             })
 
-            val updatedPHeap = st.pheap.append(node.id, e3 <&&> equals)
+            val e4 = e3.symbolToVal
+
+            val updatedPHeap = st.pheap.append(node.id, e4 <&&> equals)
             (retVal, selfObj3, updatedPHeap)
           }
         }
