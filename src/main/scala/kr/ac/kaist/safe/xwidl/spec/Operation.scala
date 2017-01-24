@@ -1,5 +1,6 @@
 package kr.ac.kaist.safe.xwidl.spec
 
+import kr.ac.kaist.safe.analyzer.domain.DefaultBool.True
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsPredHeap, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue, Sym }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.nodes.cfg.{ BlockId, CFGBlock }
@@ -243,7 +244,7 @@ case class Operation(
               case (selfObj, (x, xVal)) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
-                  selfObj.update(attr, AbsDataProp(xVal))
+                  selfObj.update(attr, AbsDataProp(xVal, DefaultBool.True, DefaultBool.False, DefaultBool.True))
                 } else {
                   selfObj
                 }
@@ -279,7 +280,10 @@ case class Operation(
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
                   val sym = Sym(NodeUtil.freshName(attr), node.id)
-                  (o.update(attr, AbsDataProp(AbsValue(AbsSym(sym)))), e.subst(x, VarExpr(sym.toString)))
+                  (
+                    o.update(attr, AbsDataProp(AbsValue(AbsSym(sym)), DefaultBool.True, DefaultBool.False, DefaultBool.True)),
+                    e.subst(x, VarExpr(sym.toString))
+                  )
                 } else {
                   (o, e)
                 }
@@ -290,7 +294,7 @@ case class Operation(
               case (e, (a, b)) => e <&&> BiOpExpr(VarExpr(a), EqOp, VarExpr(b))
             })
 
-            val updatedPHeap = st.pheap.append(node.id, e3 <&&> equals);
+            val updatedPHeap = st.pheap.append(node.id, e3 <&&> equals)
             (retVal, selfObj3, updatedPHeap)
           }
         }
