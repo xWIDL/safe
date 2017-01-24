@@ -222,25 +222,24 @@ case class Operation(
         }
         case Some(e) => {
 
-          val (e2, s, eq) = unify(e, Map(), List())
+          val (e2, valSubstTbl, valEqTbl) = unify(e, Map(), List())
 
           // TODO: dep resolution, iteration
           // val Some(e3) = e2.eval(st)
 
-          val (eq2, s2) = eqResolve(eq, s)
+          val (valEqTbl2, valSubstTbl2) = eqResolve(valEqTbl, valSubstTbl)
 
-          val fullyFreeVars = e2.freeVars ++ eq2.flatMap({ case (u, v) => Set(u, v) })
+          val fullyFreeVars = e2.freeVars ++ valEqTbl2.flatMap({ case (u, v) => Set(u, v) })
 
           if (fullyFreeVars.isEmpty) {
-            // DO I NEED TO CHECK AGAIN?
 
             // substitute
-            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type? is Top good?
+            val retVal = valSubstTbl2.getOrElse("ret", DefaultValue.Top) // use default value for certain type? is Top good?
 
             // TODO: the heap effect
 
             // self effect
-            val selfObj2 = s2.foldLeft(selfObj)({
+            val selfObj2 = valSubstTbl2.foldLeft(selfObj)({
               case (selfObj, (x, xVal)) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
@@ -254,15 +253,14 @@ case class Operation(
             (retVal, selfObj2, st.pheap)
           } else {
             // Use symbolic constraint...
-            // DO I NEED TO CHECK AGAIN?
 
             // substitute -- naive assuming that ret won't be leaked
-            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
+            val retVal = valSubstTbl2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
 
             // TODO: the heap effect
 
             // self effect
-            val selfObj2 = s2.foldLeft(selfObj)({
+            val selfObj2 = valSubstTbl2.foldLeft(selfObj)({
               case (o, (x, xVal)) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
@@ -288,7 +286,11 @@ case class Operation(
               }
             })
 
-            val updatedPHeap = st.pheap.append(node.id, e3);
+            val equals = valEqTbl2.foldLeft(ExprUtil.Top)({
+              case (e, (a, b)) => e <&&> BiOpExpr(VarExpr(a), EqOp, VarExpr(b))
+            })
+
+            val updatedPHeap = st.pheap.append(node.id, e3 <&&> equals);
             (retVal, selfObj3, updatedPHeap)
           }
         }
