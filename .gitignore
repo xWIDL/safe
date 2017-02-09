@@ -27,3 +27,15 @@ lib/debugger/webix.js
 lib/debugger/css/webix.css
 doc/safe.pdf
 .idea
+.dependencies/
+junit-results/
+project/project/
+project/target/
+src/main/java/kr/ac/kaist/jsaf/nodes/
+src/main/java/kr/ac/kaist/jsaf/parser/JS.java
+src/main/java/kr/ac/kaist/jsaf/parser/Json.java
+src/main/java/kr/ac/kaist/jsaf/parser/RegExp.java
+src/main/java/kr/ac/kaist/jsaf/parser/TS.java
+src/main/java/kr/ac/kaist/jsaf/parser/WIDL.java
+src/main/scala/kr/ac/kaist/jsaf/scala_src/nodes/
+target/
