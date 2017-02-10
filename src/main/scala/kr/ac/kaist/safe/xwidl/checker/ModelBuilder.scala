@@ -31,7 +31,7 @@ object ModelBuilder {
         interface.operations.map({
           case (name, op) => NormalProp(name, FuncModel(
             name = interface.name + '.' + name,
-            code = BasicCode(argLen = op.args.length, opHashSet, (_, _) => ???, Some((args, st, node) => { // HACK
+            code = BasicCode(argLen = op.args.length, opHashSet, (_, _) => ???, Some((args, st, cp, preds) => { // HACK
               // A rough check: If all arguments type-match, then return a most general
               // representation of the returned type
 
@@ -61,7 +61,7 @@ object ModelBuilder {
                         case Some(sem) => (h, sem(st, absArgs), pheap, excSet)
                         case None => {
 
-                          val (retVal, thisObj2, retPHeap) = op.call(solver, st, thisObj, interface, absArgs, node)
+                          val (retVal, thisObj2, retPHeap) = op.call(solver, st, thisObj, interface, absArgs, cp.node)
 
                           (h.update(loc, thisObj2), if (retVal.pvalue != null) {
                             retVal + value
@@ -74,9 +74,9 @@ object ModelBuilder {
                       // Print out what is wrong
                       argsMatch.filter({ case (i, matched) => !matched }).foreach({
                         case (i, _) => {
-                          println(s"[xWIDL-TYPE-ERROR: ${node.span}] ${i}th argument ${absArgs(i)} of " +
+                          println(s"[xWIDL-TYPE-ERROR: ${preds.map(_.node.span.toString)}]" +
+                            s" ${i}th argument ${absArgs(i)} of " +
                             s"${interface.name}.$name is not ${op.args(i).ty}")
-                          // FIXME: it is non-trivial to find the callsite's span.
                         }
                       })
                       (h, DefaultNull.Top, pheap, excSet)

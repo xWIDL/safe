@@ -226,7 +226,8 @@ class Semantics(
             I(inst, oldSt, oldExcSt)
           })
         case ModelBlock(_, sem) => {
-          val (retSt, excSt) = sem(st, cp.node)
+          val preds = getInterProcPred(ControlPoint(cp.node.func.entry, cp.callContext)).getOrElse(Set())
+          val (retSt, excSt) = sem(st, cp, preds)
           (retSt, excSt)
         }
       }

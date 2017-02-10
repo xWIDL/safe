@@ -15,7 +15,7 @@ import kr.ac.kaist.safe.analyzer.domain.AbsState
 import kr.ac.kaist.safe.nodes.cfg.CFGBlock
 
 package object models {
-  type SemanticFun = (AbsState, CFGBlock) => (AbsState, AbsState)
+  type SemanticFun = (AbsState, ControlPoint, Set[ControlPoint]) => (AbsState, AbsState)
   val T = true
   val F = false
 }

@@ -11,12 +11,14 @@
 
 package kr.ac.kaist.safe.analyzer.models
 
+import kr.ac.kaist.safe.analyzer.ControlPoint
 import kr.ac.kaist.safe.analyzer.domain._
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.nodes.cfg._
 import kr.ac.kaist.safe.nodes.ir.IRModelFunc
 import kr.ac.kaist.safe.nodes.ast.{ ASTNodeInfo, ModelFunc }
 import kr.ac.kaist.safe.util.{ Address, Span, SystemAddr }
+
 import scala.collection.immutable.HashSet
 
 abstract class Code {
@@ -53,7 +55,7 @@ class BasicCode(
     override val argLen: Int = 0,
     addrSet: Set[Address] = HashSet(),
     code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue),
-    codeOpt: Option[(AbsValue, AbsState, CFGBlock) => (AbsState, AbsState, AbsValue)] = None // HACK
+    codeOpt: Option[(AbsValue, AbsState, ControlPoint, Set[ControlPoint]) => (AbsState, AbsState, AbsValue)] = None // HACK
 ) extends Code {
   override def getAllAddrSet: Set[Address] = addrSet
   def getCFGFunc(cfg: CFG, name: String): CFGFunction = {
@@ -66,14 +68,14 @@ class BasicCode(
     func
   }
 
-  private def createSemanticFunc(argsName: String): SemanticFun = (st, node) => {
+  private def createSemanticFunc(argsName: String): SemanticFun = (st, cp, preds) => {
     val heap = st.heap
     val context = st.context
     val stBotPair = (AbsState.Bot, AbsState.Bot)
     val localEnv = context.pureLocal.record.decEnvRec
     val (argV, _) = localEnv.GetBindingValue(argsName)
     val (retSt, retSte, retV) = codeOpt match {
-      case Some(f) => f(argV, st, node)
+      case Some(f) => f(argV, st, cp, preds)
       case None => code(argV, st)
     }
     val (retObj, _) = localEnv.SetMutableBinding("@return", retV)
@@ -86,7 +88,7 @@ object BasicCode {
     argLen: Int = 0,
     addrSet: Set[Address] = HashSet(),
     code: (AbsValue, AbsState) => (AbsState, AbsState, AbsValue),
-    codeOpt: Option[(AbsValue, AbsState, CFGBlock) => (AbsState, AbsState, AbsValue)] = None // HACK
+    codeOpt: Option[(AbsValue, AbsState, ControlPoint, Set[ControlPoint]) => (AbsState, AbsState, AbsValue)] = None // HACK
   ): BasicCode = new BasicCode(argLen, addrSet, code, codeOpt)
 }
 
@@ -119,7 +121,7 @@ class CallCode(
     func
   }
 
-  private def createBeforeFunc(argsName: String, newAddr: Address): SemanticFun = (st, _) => {
+  private def createBeforeFunc(argsName: String, newAddr: Address): SemanticFun = (st, _, _) => {
     val heap = st.heap
     val context = st.context
     val localEnv = context.pureLocal.record.decEnvRec
@@ -128,7 +130,7 @@ class CallCode(
     (newSt, newExcSt)
   }
 
-  private def createAfterFunc(argsName: String): SemanticFun = (st, _) => {
+  private def createAfterFunc(argsName: String): SemanticFun = (st, _, _) => {
     val heap = st.heap
     val context = st.context
     val localEnv = context.pureLocal.record.decEnvRec
