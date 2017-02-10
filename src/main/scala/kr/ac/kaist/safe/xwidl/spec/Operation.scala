@@ -1,5 +1,6 @@
 package kr.ac.kaist.safe.xwidl.spec
 
+import kr.ac.kaist.safe.analyzer.domain.DefaultBool.True
 import kr.ac.kaist.safe.analyzer.domain.{ AbsObject, AbsPredHeap, AbsState, AbsValue, DefaultBool, DefaultNull, DefaultValue, Sym }
 import kr.ac.kaist.safe.analyzer.domain.Utils._
 import kr.ac.kaist.safe.nodes.cfg.{ BlockId, CFGBlock }
@@ -92,7 +93,12 @@ case class Operation(
           genConfig(xs, keys).map((x, Right(v.symbol.map(identity).head)) :: _)
         }
 
-        genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
+        if (v.pvalue.isBottom) {
+          // FIXME: locset?
+          symConfigs
+        } else {
+          genConfig(xs, keys).map((x, Left(v)) :: _) ++ symConfigs
+        }
         // NOTE that we didn't erase the symbol projection in Left case
       }
     case _ => List(List())
@@ -151,12 +157,20 @@ case class Operation(
       })
 
       val cond: Expr = relevantKeys.foldLeft(ExprUtil.Top)({
-        case (e, id) => e <&&> st.pheap.get(id)
+        case (e, id) => {
+          e <&&> st.pheap.get(id)
+        }
       }) // TODO: rewrite?
 
-      (cond <=>> requiresInstantiated).eval(st) match {
+      val target = cond <=>> requiresInstantiated
+
+      val targetClosed = target.freeVars.foldLeft(target)({
+        case (e, x) => ExistsExpr(x, TyInt, e) // FIXME: fetch type info from spec
+      })
+
+      targetClosed.eval(st) match {
         case Some(AbsValExpr(v)) => DefaultBool.True <= v.pvalue.boolval // abstract judgement
-        case Some(e) => solver.assert(e) match {
+        case Some(e) => solver.assert(e.rename("s")) match {
           // symbolic judgement
           case Verified => true
           case _ => false
@@ -211,29 +225,28 @@ case class Operation(
         }
         case Some(e) => {
 
-          val (e2, s, eq) = unify(e, Map(), List())
+          val (e2, valSubstTbl, valEqTbl) = unify(e, Map(), List())
 
           // TODO: dep resolution, iteration
           // val Some(e3) = e2.eval(st)
 
-          val (eq2, s2) = eqResolve(eq, s)
+          val (valEqTbl2, valSubstTbl2) = eqResolve(valEqTbl, valSubstTbl)
 
-          val fullyFreeVars = e2.freeVars ++ eq2.flatMap({ case (u, v) => Set(u, v) })
+          val fullyFreeVars = e2.freeVars ++ valEqTbl2.flatMap({ case (u, v) => Set(u, v) })
 
           if (fullyFreeVars.isEmpty) {
-            // DO I NEED TO CHECK AGAIN?
 
             // substitute
-            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type? is Top good?
+            val retVal = valSubstTbl2.getOrElse("ret", DefaultValue.Top) // use default value for certain type? is Top good?
 
             // TODO: the heap effect
 
             // self effect
-            val selfObj2 = s2.foldLeft(selfObj)({
+            val selfObj2 = valSubstTbl2.foldLeft(selfObj)({
               case (selfObj, (x, xVal)) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
-                  selfObj.update(attr, AbsDataProp(xVal))
+                  selfObj.update(attr, AbsDataProp(xVal, DefaultBool.True, DefaultBool.False, DefaultBool.True))
                 } else {
                   selfObj
                 }
@@ -243,15 +256,14 @@ case class Operation(
             (retVal, selfObj2, st.pheap)
           } else {
             // Use symbolic constraint...
-            // DO I NEED TO CHECK AGAIN?
 
             // substitute -- naive assuming that ret won't be leaked
-            val retVal = s2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
+            val retVal = valSubstTbl2.getOrElse("ret", DefaultValue.Top) // use default value for certain type?
 
             // TODO: the heap effect
 
             // self effect
-            val selfObj2 = s2.foldLeft(selfObj)({
+            val selfObj2 = valSubstTbl2.foldLeft(selfObj)({
               case (o, (x, xVal)) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
@@ -269,15 +281,25 @@ case class Operation(
               case ((o, e), x) => {
                 if (x.startsWith("this.")) {
                   val attr = x.stripPrefix("this.")
-                  val sym = NodeUtil.freshName(attr)
-                  (o.update(attr, AbsDataProp(AbsValue(AbsSym(Sym(sym, node.id))))), e.subst(x, VarExpr(sym)))
+                  val sym = Sym(NodeUtil.freshName(attr), node.id)
+                  (
+                    o.update(attr, AbsDataProp(AbsValue(AbsSym(sym)), DefaultBool.True, DefaultBool.False, DefaultBool.True)),
+                    e.subst(x, VarExpr(sym.toString))
+                  )
                 } else {
                   (o, e)
                 }
               }
             })
 
-            (retVal, selfObj3, st.pheap.append(node.id, e3))
+            val equals = valEqTbl2.foldLeft(ExprUtil.Top)({
+              case (e, (a, b)) => e <&&> BiOpExpr(VarExpr(a), EqOp, VarExpr(b))
+            })
+
+            val e4 = e3.symbolToVal
+
+            val updatedPHeap = st.pheap.append(node.id, e4 <&&> equals)
+            (retVal, selfObj3, updatedPHeap)
           }
         }
       }
